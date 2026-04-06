@@ -131,7 +131,7 @@ public record Attributes(Dictionary<string, DnValue> DnValueDictionary, IParentD
 
     public IEnumerable<KeyValuePair<string, DnValue>> AllAttributes()
     {
-        return DnValueDictionary.Select(kvp => new KeyValuePair<string, DnValue>(kvp.Key, kvp.Value));
+        return [.. DnValueDictionary.Select(kvp => new KeyValuePair<string, DnValue>(kvp.Key, kvp.Value))];
     }
 
     public Attributes Copy(IParentDataNode parent)
@@ -188,7 +188,7 @@ public class DataNode : IParentDataNode
         return Keys.AttributesDictionary.ContainsKey(key);
     }
 
-    public void Set(string key, Attributes properties)
+    public void Set(string key, Attributes attributes)
     {
         key = key.ToUpper();
 
@@ -200,16 +200,16 @@ public class DataNode : IParentDataNode
         {
             throw new InvalidOperationException($"Keys count exceeds the limit of {KeysCountLimit}.");
         }
-        Keys.AttributesDictionary[key] = properties;
+        Keys.AttributesDictionary[key] = attributes;
     }
 
     public Attributes? Get(string key)
     {
         key = key.ToUpper();
 
-        if (Keys.AttributesDictionary.TryGetValue(key, out Attributes? properties))
+        if (Keys.AttributesDictionary.TryGetValue(key, out Attributes? attributes))
         {
-            return properties;
+            return attributes;
         }
         else
         {
@@ -221,16 +221,16 @@ public class DataNode : IParentDataNode
     {
         key = key.ToUpper();
 
-        var properties = Get(key);
-        if (properties != null)
+        var attributes = Get(key);
+        if (attributes != null)
         {
-            return properties;
+            return attributes;
         }
         else
         {
-            properties = Attributes.Create(this);
-            Set(key, properties);
-            return properties;
+            attributes = Attributes.Create(this);
+            Set(key, attributes);
+            return attributes;
         }
     }
 
@@ -248,13 +248,13 @@ public class DataNode : IParentDataNode
         return [.. Index.AttributesIndex.Select((p, i) => new KeyValuePair<int, Attributes>(i, p))];
     }
     
-    public void Add(Attributes properties)
+    public void Add(Attributes attributes)
     {
         if (Index.AttributesIndex.Count >= IndexCountLimit)
         {
             throw new InvalidOperationException($"Index count exceeds the limit of {IndexCountLimit}.");
         }
-        Index.AttributesIndex.Add(properties);
+        Index.AttributesIndex.Add(attributes);
     }
 
     public Attributes Add()
@@ -263,23 +263,23 @@ public class DataNode : IParentDataNode
         return Index.AttributesIndex[^1];
     }
 
-    public void Set(int index, Attributes properties)
+    public void Set(int index, Attributes attributes)
     {
         if (index < 0)
         {
-            Index.AttributesIndex[0] = properties;
+            Index.AttributesIndex[0] = attributes;
         }
         else if (index >= Index.AttributesIndex.Count)
         {
-            Index.AttributesIndex[^1] = properties;
+            Index.AttributesIndex[^1] = attributes;
         }
         else
         {
-            Index.AttributesIndex[index] = properties;
+            Index.AttributesIndex[index] = attributes;
         }
     }
 
-    public void Insert(int index, Attributes properties)
+    public void Insert(int index, Attributes attributes)
     {
         if (Index.AttributesIndex.Count >= IndexCountLimit)
         {
@@ -288,15 +288,15 @@ public class DataNode : IParentDataNode
 
         if (index < 0)
         {
-            Index.AttributesIndex.Insert(0, properties);
+            Index.AttributesIndex.Insert(0, attributes);
         }
         else if (index >= Index.AttributesIndex.Count)
         {
-            Add(properties);
+            Add(attributes);
         }
         else
         {
-            Index.AttributesIndex.Insert(index, properties);
+            Index.AttributesIndex.Insert(index, attributes);
         }
     }
 
