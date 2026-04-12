@@ -1,174 +1,18 @@
-﻿using System.Collections.Generic;
+﻿
 namespace DataNode.Core;
-
-public abstract record DnValue
-{
-    public static implicit operator DnValue(string v)
-    {
-        return new StringValue(v);
-    }
-
-    public static implicit operator DnValue(int v)
-    {
-        return new IntegerValue(v);
-    }
-
-    public static implicit operator DnValue(decimal v)
-    {
-        return new DecimalValue(v);
-    }
-}
-
-public record StringValue(string Value) : DnValue;
-public record IntegerValue(int Value) : DnValue;
-public record DecimalValue(decimal Value) : DnValue;
-public record Attributes(Dictionary<string, DnValue> DnValueDictionary, IParentDataNode Parent )
-{
-    public static Attributes Create(IParentDataNode parent) => new([], parent);
-
-    public string? GetString(string attributeName)
-    {
-        attributeName = attributeName.ToUpper();
-        if (DnValueDictionary.TryGetValue(attributeName, out DnValue? value))
-        {
-            if (value is StringValue stringValue)
-            {
-                return stringValue.Value;
-            }
-        }
-        return null;
-    }
-
-    public int? GetInteger(string attributeName)
-    {
-        attributeName = attributeName.ToUpper();
-        if (DnValueDictionary.TryGetValue(attributeName, out DnValue? value))
-        {
-            if (value is IntegerValue integerValue)
-            {
-                return integerValue.Value;
-            }
-        }
-        return null;
-    }
-
-    public decimal? GetDecimal(string attributeName)
-    {
-        attributeName = attributeName.ToUpper();
-        if (DnValueDictionary.TryGetValue(attributeName, out DnValue? value))
-        {
-            if (value is DecimalValue decimalValue)
-            {
-                return decimalValue.Value;
-            }
-        }
-        return null;
-    }
-
-    public void Set(string attributeName, string value)
-    {
-        if (attributeName.Length > Parent.AttributeLengthLimit)
-        {
-            throw new ArgumentException($"Attribute name length exceeds the limit of {Parent.AttributeLengthLimit} characters.");
-        }
-        if ( value.Length > Parent.StringValueLengthLimit)
-        {
-            throw new ArgumentException($"String value length exceeds the limit of {Parent.StringValueLengthLimit} characters.");
-        }
-
-        attributeName = attributeName.ToUpper();
-
-        if (DnValueDictionary.Count >= Parent.AttributesCountLimit && !DnValueDictionary.ContainsKey(attributeName))
-        {
-            throw new InvalidOperationException($"Attributes count exceeds the limit of {Parent.AttributesCountLimit}.");
-        }
-        DnValueDictionary[attributeName] = value;
-    }
-
-    public void Set(string attributeName, int value)
-    {
-        if (attributeName.Length > Parent.AttributeLengthLimit)
-        {
-            throw new ArgumentException($"Attribute name length exceeds the limit of {Parent.AttributeLengthLimit} characters.");
-        }
-
-        attributeName = attributeName.ToUpper();
-
-        if (DnValueDictionary.Count >= Parent.AttributesCountLimit && !DnValueDictionary.ContainsKey(attributeName))
-        {
-            throw new InvalidOperationException($"Attributes count exceeds the limit of {Parent.AttributesCountLimit}.");
-        }
-        DnValueDictionary[attributeName] = value;
-    }
-
-    public void Set(string attributeName, decimal value)
-    {
-        if (attributeName.Length > Parent.AttributeLengthLimit)
-        {
-            throw new ArgumentException($"Attribute name length exceeds the limit of {Parent.AttributeLengthLimit} characters.");
-        }
-
-        attributeName = attributeName.ToUpper();
-
-        if (DnValueDictionary.Count >= Parent.AttributesCountLimit && !DnValueDictionary.ContainsKey(attributeName))
-        {
-            throw new InvalidOperationException($"Attributes count exceeds the limit of {Parent.AttributesCountLimit}.");
-        }
-        DnValueDictionary[attributeName] = value;
-    }
-
-    public void Remove(string attributeName)
-    {
-        attributeName = attributeName.ToUpper();
-        DnValueDictionary.Remove(attributeName);
-    }
-
-    public bool Contains(string attributeName)
-    {
-        attributeName = attributeName.ToUpper();
-        return DnValueDictionary.ContainsKey(attributeName);
-    }
-
-    public IEnumerable<KeyValuePair<string, DnValue>> AllAttributes()
-    {
-        return [.. DnValueDictionary.Select(kvp => new KeyValuePair<string, DnValue>(kvp.Key, kvp.Value))];
-    }
-
-    public Attributes Copy(IParentDataNode parent)
-    {
-        return new Attributes(new Dictionary<string, DnValue>(DnValueDictionary), parent);
-    }
-
-    public int Count { get { return DnValueDictionary.Count; } }
-
-}
-public record Keys(Dictionary<string, Attributes> AttributesDictionary);
-public record Index(List<Attributes> AttributesIndex);
 
 public interface IParentDataNode
 {
-    short AttributeLengthLimit { get; }
-    short StringValueLengthLimit { get; }
-    short AttributesCountLimit { get; }
-
-    short KeyLengthLimit { get; }
-    short KeysCountLimit { get; }
-    short IndexCountLimit { get; }
 }
 
 public class DataNode : IParentDataNode
 {
+
     #region Properties and Fields
-    private readonly Keys Keys = new([]);
-    private readonly Index Index = new([]);
-    public short AttributeLengthLimit { get { return 64; } }
-    public short AttributesCountLimit { get { return 8; } }
-    public short StringValueLengthLimit { get { return 256; } }    
-    public short KeyLengthLimit { get { return 64; } }
-    public short KeysCountLimit { get { return 72; } }
-    public short IndexCountLimit { get { return 64; } }
-    public int KeysCount { get { return Keys.AttributesDictionary.Count ;} }  
-    public int IndexCount { get { return Index.AttributesIndex.Count ;} } 
+    private readonly Dictionary<string, Attributes> Keys = new([]);
+    private readonly List<string> Index = new([]);
+    public int KeysCount { get { return Keys.Count ;} }  
+    public int IndexCount { get { return Index.Count ;} } 
 
     #endregion
 
@@ -177,37 +21,60 @@ public class DataNode : IParentDataNode
     }
 
     #region Keys
-    public IEnumerable<KeyValuePair<string, Attributes>> AllKeys()
+
+    private static string ValidateKey(string key)
     {
-        return [.. Keys.AttributesDictionary.Select(kvp => new KeyValuePair<string, Attributes>(kvp.Key, kvp.Value))];
+        if (key.Length > System.KeyLengthLimit)
+        {
+            throw new ArgumentException($"Key length exceeds the limit of {System.KeyLengthLimit} characters.");
+        }
+        return key.ToUpper();
+    }
+   
+    public IEnumerable<KeyValuePair<string, Attributes>> All()
+    {
+        var nonIndexed = Keys
+        .Where(kvp => !Index.Contains(kvp.Key))
+        .OrderBy(kvp => kvp.Key)
+        .Select(kvp => new KeyValuePair<string, Attributes>(kvp.Key, kvp.Value));
+
+        var indexed = Keys
+        .Where(kvp => Index.Contains(kvp.Key))
+        .OrderBy(kvp => Index.IndexOf(kvp.Key))
+        .Select(kvp => new KeyValuePair<string, Attributes>(kvp.Key, kvp.Value));
+
+        return [.. nonIndexed, .. indexed];
     }
     
     public bool ContainsKey(string key)
     {
-        key = key.ToUpper();
-        return Keys.AttributesDictionary.ContainsKey(key);
+        key = ValidateKey(key);
+        return Keys.ContainsKey(key);
     }
 
     public void Set(string key, Attributes attributes)
     {
-        key = key.ToUpper();
+        key = ValidateKey(key);
 
-        if (key.Length > KeyLengthLimit)
+        if (key.Length > System.KeyLengthLimit)
         {
-            throw new ArgumentException($"Key length exceeds the limit of {KeyLengthLimit} characters.");
+            throw new ArgumentException($"Key length exceeds the limit of {System.KeyLengthLimit} characters.");
         }
-        if (Keys.AttributesDictionary.Count >= KeysCountLimit && !ContainsKey(key))
+        if (KeysCount >= System.KeysCountLimit && !ContainsKey(key))
         {
-            throw new InvalidOperationException($"Keys count exceeds the limit of {KeysCountLimit}.");
+            throw new InvalidOperationException($"Keys count exceeds the limit of {System.KeysCountLimit}.");
         }
-        Keys.AttributesDictionary[key] = attributes;
+        attributes.Key = key;
+        attributes.Parent = this;
+        Keys[key] = attributes;
+        SetIndex(key);
     }
 
     public Attributes? Get(string key)
     {
-        key = key.ToUpper();
+        key = ValidateKey(key);
 
-        if (Keys.AttributesDictionary.TryGetValue(key, out Attributes? attributes))
+        if (Keys.TryGetValue(key, out Attributes? attributes))
         {
             return attributes;
         }
@@ -219,7 +86,7 @@ public class DataNode : IParentDataNode
 
     public Attributes GetOrCreate(string key)
     {
-        key = key.ToUpper();
+        key = ValidateKey(key);
 
         var attributes = Get(key);
         if (attributes != null)
@@ -228,7 +95,7 @@ public class DataNode : IParentDataNode
         }
         else
         {
-            attributes = Attributes.Create(this);
+            attributes = Attributes.Create(this, key);
             Set(key, attributes);
             return attributes;
         }
@@ -236,119 +103,210 @@ public class DataNode : IParentDataNode
 
     public void Remove(string key)
     {
-        key = key.ToUpper();
-        Keys.AttributesDictionary.Remove(key);
+        key = ValidateKey(key);
+        Keys.Remove(key);
+        RemoveIndex(key);
+    }
+
+    #endregion
+
+    #region Attribute
+
+    public void Set(string key, string attributeName, string value)
+    {
+        var attributes = GetOrCreate(key);
+        attributes.Set(attributeName, value);
+    }
+
+    public void Set(string key, string attributeName, int value)
+    {
+        var attributes = GetOrCreate(key);
+        attributes.Set(attributeName, value);
+    }
+
+    public void Set(string key, string attributeName, decimal value)
+    {
+        var attributes = GetOrCreate(key);
+        attributes.Set(attributeName, value);
+    }
+
+    public DnValue? Get(string key, string attributeName)
+    {
+        var attributes = Get(key);
+        if (attributes != null)
+        {
+            return attributes.Get(attributeName);
+        }
+        else
+        {
+            return null;
+        }
+    }
+
+    public string? GetString(string key, string attributeName)
+    {
+        var attributes = Get(key);
+        if (attributes != null)
+        {
+            return attributes.GetString(attributeName);
+        }
+        else
+        {
+            return null;
+        }
+    }
+
+    public int? GetInteger(string key, string attributeName)
+    {
+        var attributes = Get(key);
+        if (attributes != null)
+        {
+            return attributes.GetInteger(attributeName);
+        }
+        else
+        {
+            return null;
+        }
+    }
+
+    public decimal? GetDecimal(string key, string attributeName)
+    {
+        var attributes = Get(key);
+        if (attributes != null)
+        {
+            return attributes.GetDecimal(attributeName);
+        }
+        else
+        {
+            return null;
+        }
+    }
+
+    public void Remove(string key, string attributeName)
+    {
+        var attributes = Get(key);
+        attributes?.Remove(attributeName);
+    }
+
+    public bool Contains(string key, string attributeName)
+    {
+        var attributes = Get(key);
+        if (attributes != null)
+        {
+            return attributes.Contains(attributeName);
+        }
+        else
+        {
+            return false;
+        }
     }
 
     #endregion
 
     #region Index
-    public IEnumerable<KeyValuePair<int, Attributes>> AllIndex()
+    public int SetIndex(string key)
     {
-        return [.. Index.AttributesIndex.Select((p, i) => new KeyValuePair<int, Attributes>(i, p))];
-    }
-    
-    public void Add(Attributes attributes)
-    {
-        if (Index.AttributesIndex.Count >= IndexCountLimit)
-        {
-            throw new InvalidOperationException($"Index count exceeds the limit of {IndexCountLimit}.");
-        }
-        Index.AttributesIndex.Add(attributes);
-    }
+        key = ValidateKey(key);
 
-    public Attributes Add()
-    {
-        Add(Attributes.Create(this));
-        return Index.AttributesIndex[^1];
-    }
-
-    public void Set(int index, Attributes attributes)
-    {
-        if (index < 0)
+        if (key.StartsWith(System.SysPrefix))
         {
-            Index.AttributesIndex[0] = attributes;
+            return -1; // System keys are not indexed
         }
-        else if (index >= Index.AttributesIndex.Count)
+
+        if (Contains(SysKeys.NoIndex, key))
         {
-            Index.AttributesIndex[^1] = attributes;
+            return -1; // Key is not indexed
+        }
+
+        if (Index.Contains(key))
+        {
+            return Index.IndexOf(key);
         }
         else
         {
-            Index.AttributesIndex[index] = attributes;
+            Index.Add(key);
         }
+        return Index.IndexOf(key);
     }
 
-    public void Insert(int index, Attributes attributes)
+    public bool RemoveIndex(string key)
     {
-        if (Index.AttributesIndex.Count >= IndexCountLimit)
-        {
-            throw new InvalidOperationException($"Index count exceeds the limit of {IndexCountLimit}.");
-        }
-
-        if (index < 0)
-        {
-            Index.AttributesIndex.Insert(0, attributes);
-        }
-        else if (index >= Index.AttributesIndex.Count)
-        {
-            Add(attributes);
-        }
-        else
-        {
-            Index.AttributesIndex.Insert(index, attributes);
-        }
+        key = ValidateKey(key);
+        return Index.Remove(key);
     }
 
-    public Attributes? Get(int index)
+    public int MoveToIndex(string key, int newIndex)
     {
-        if (index >= 0 && index < Index.AttributesIndex.Count)
+        key = ValidateKey(key);
+
+        if (!ContainsKey(key))
         {
-            return Index.AttributesIndex[index];
+            throw new KeyNotFoundException($"Key '{key}' not found.");
         }
-        else
+        if (newIndex < 0 || newIndex >= Index.Count)
         {
-            return null;
+            throw new ArgumentOutOfRangeException($"New index '{newIndex}' is out of range.");
         }
+
+        Index.Remove(key);
+        Index.Insert(newIndex, key);
+        return newIndex;
     }
 
-    public Attributes GetOrCreate(int index)
+    public int MoveToEnd(string key)
     {
-        var properties = Get(index);
-        if (properties != null)
+        key = ValidateKey(key);
+
+        if (!ContainsKey(key))
         {
-            return properties;
+            throw new KeyNotFoundException($"Key '{key}' not found.");
         }
-        else
-        {
-            properties = Attributes.Create(this);
-            Insert(index, properties);
-            return properties;
-        }
+
+        Index.Remove(key);
+        Index.Add(key);
+        return Index.Count - 1;
     }
 
-    public Attributes? GetAndRemove(int index)
+    public int MoveToStart(string key)
     {
-        if (index >= 0 && index < Index.AttributesIndex.Count)
+        key = ValidateKey(key);
+
+        if (!ContainsKey(key))
         {
-            var properties = Index.AttributesIndex[index];
-            Index.AttributesIndex.RemoveAt(index);
-            return properties;
+            throw new KeyNotFoundException($"Key '{key}' not found.");
         }
-        else
-        {
-            return null;
-        }
+
+        Index.Remove(key);
+        Index.Insert(0, key);
+        return 0;
     }
 
-    public void Remove(int index)
+    public int Move(string key, int offset)
     {
-        if (index >= 0 && index < Index.AttributesIndex.Count)
+        key = ValidateKey(key);
+
+        if (!ContainsKey(key))
         {
-            Index.AttributesIndex.RemoveAt(index);
+            throw new KeyNotFoundException($"Key '{key}' not found.");
         }
-    }    
+
+        var currentIndex = Index.IndexOf(key);
+        var newIndex = Math.Max(0, Math.Min(Index.Count - 1, currentIndex + offset));
+
+        return MoveToIndex(key, newIndex);
+    }
+
+    public void SetUnindexed(string key)
+    {
+        Set(SysKeys.NoIndex, key, 1);
+        RemoveIndex(key);
+    }
+
+    public int SetIndexed(string key)
+    {
+        Remove(SysKeys.NoIndex, key);
+        return SetIndex(key);
+    }
 
     #endregion
-
 }
