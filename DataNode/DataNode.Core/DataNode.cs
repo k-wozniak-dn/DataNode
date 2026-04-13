@@ -7,18 +7,16 @@ public interface IParentDataNode
 
 public class DataNode : IParentDataNode
 {
+    public DataNode() : base()
+    {
+    }
 
     #region Properties and Fields
     private readonly Dictionary<string, Attributes> Keys = new([]);
     private readonly List<string> Index = new([]);
-    public int KeysCount { get { return Keys.Count ;} }  
-    public int IndexCount { get { return Index.Count ;} } 
+    public int CountNonSys { get { return Keys.Count(kvp => !kvp.Key.StartsWith(System.SysPrefix)) ;} }  
 
     #endregion
-
-    public DataNode() : base()
-    {
-    }
 
     #region Keys
 
@@ -31,19 +29,22 @@ public class DataNode : IParentDataNode
         return key.ToUpper();
     }
    
-    public IEnumerable<KeyValuePair<string, Attributes>> All()
+    public IEnumerable<KeyValuePair<string, Attributes>> GetAll()
     {
+        var sys = Keys
+        .Where(kvp => kvp.Key.StartsWith(System.SysPrefix))
+        .OrderBy(kvp => kvp.Key);
+
         var nonIndexed = Keys
-        .Where(kvp => !Index.Contains(kvp.Key))
-        .OrderBy(kvp => kvp.Key)
-        .Select(kvp => new KeyValuePair<string, Attributes>(kvp.Key, kvp.Value));
+        .Where(kvp => !Index.Contains(kvp.Key) && !kvp.Key.StartsWith(System.SysPrefix))
+        .OrderBy(kvp => kvp.Key);
 
         var indexed = Keys
         .Where(kvp => Index.Contains(kvp.Key))
-        .OrderBy(kvp => Index.IndexOf(kvp.Key))
-        .Select(kvp => new KeyValuePair<string, Attributes>(kvp.Key, kvp.Value));
+        .OrderBy(kvp => Index.IndexOf(kvp.Key));
 
-        return [.. nonIndexed, .. indexed];
+        var result = sys.Concat(nonIndexed).Concat(indexed).ToArray();
+        return result;
     }
     
     public bool ContainsKey(string key)
@@ -60,7 +61,7 @@ public class DataNode : IParentDataNode
         {
             throw new ArgumentException($"Key length exceeds the limit of {System.KeyLengthLimit} characters.");
         }
-        if (KeysCount >= System.KeysCountLimit && !ContainsKey(key))
+        if (CountNonSys >= System.KeysCountLimit && !ContainsKey(key))
         {
             throw new InvalidOperationException($"Keys count exceeds the limit of {System.KeysCountLimit}.");
         }
@@ -106,6 +107,12 @@ public class DataNode : IParentDataNode
         key = ValidateKey(key);
         Keys.Remove(key);
         RemoveIndex(key);
+    }
+
+    public void Clear()
+    {
+        Keys.Clear();
+        Index.Clear();
     }
 
     #endregion
@@ -308,5 +315,52 @@ public class DataNode : IParentDataNode
         return SetIndex(key);
     }
 
+    public void SetIndexAttributes()
+    {
+        Index.ForEach(key => Set(key, SysAttributes.Position, Index.IndexOf(key)));
+    }
+
+    public void ClearIndexAttributes()
+    {
+        GetAll().Where(kvp => kvp.Value.Contains(SysAttributes.Position)).ToList()
+        .ForEach(kvp => Remove(kvp.Key, SysAttributes.Position));
+    }
+    #endregion
+
+    #region Export and Import
+    public IEnumerable<KeyValuePair<string, Attributes>> Export()
+    {
+        SetIndexAttributes();
+        var result = GetAll();
+        ClearIndexAttributes();
+        return result;
+    }
+
+    public void Import(IEnumerable<KeyValuePair<string, Attributes>> data)
+    {
+        Clear();
+
+        var sys = data
+        .Where(kvp => kvp.Key.StartsWith(System.SysPrefix))
+        .OrderBy(kvp => kvp.Key);
+
+        var nonIndexed = data
+        .Where(kvp => !kvp.Key.StartsWith(System.SysPrefix) && !kvp.Value.Contains(SysAttributes.Position))
+        .OrderBy(kvp => kvp.Key);
+
+        var indexed = data
+        .Where(kvp => !kvp.Key.StartsWith(System.SysPrefix) && kvp.Value.Contains(SysAttributes.Position))
+        .OrderBy(kvp => kvp.Value.GetInteger(SysAttributes.Position));
+
+        var import = sys.Concat(nonIndexed).Concat(indexed).ToArray();
+
+        foreach (var kvp in import)
+        {
+            var attributes = kvp.Value.Copy(this, kvp.Key);
+            Set(kvp.Key, attributes);
+        }
+
+        ClearIndexAttributes();
+    }
     #endregion
 }

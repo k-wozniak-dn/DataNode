@@ -104,6 +104,6 @@ public record Attributes(Dictionary<string, DnValue> DnValueDictionary, IParentD
         return new Attributes(new Dictionary<string, DnValue>(DnValueDictionary), parent, key);
     }
 
-    public int Count { get { return DnValueDictionary.Count; } }
+    public int CountNonSys { get { return DnValueDictionary.Count(kvp => !kvp.Key.StartsWith(System.SysPrefix)); } }
 
 }
