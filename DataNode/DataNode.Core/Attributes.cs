@@ -48,7 +48,7 @@ public record Attributes(Dictionary<string, DnValue> DnValueDictionary, IParentD
         return value is DecimalValue decimalValue ? decimalValue.Value : null;
     }
 
-    public void Set(string attributeName, string value, bool existingOnly = false)
+    public Attributes Set(string attributeName, string value, bool existingOnly = false)
     {
         attributeName = ValidateAttributeName(attributeName);
         if ( value.Length > System.StringValueLengthLimit)
@@ -64,9 +64,10 @@ public record Attributes(Dictionary<string, DnValue> DnValueDictionary, IParentD
             throw new InvalidOperationException($"Attribute '{attributeName}' does not exist. Use Add to add.");
         }
         DnValueDictionary[attributeName] = value;
+        return this;
     }
 
-    public void Set(string attributeName, int value, bool existingOnly = false)
+    public Attributes Set(string attributeName, int value, bool existingOnly = false)
     {
         attributeName = ValidateAttributeName(attributeName);
         if (DnValueDictionary.Count >= System.AttributesCountLimit && !DnValueDictionary.ContainsKey(attributeName))
@@ -78,9 +79,10 @@ public record Attributes(Dictionary<string, DnValue> DnValueDictionary, IParentD
             throw new InvalidOperationException($"Attribute '{attributeName}' does not exist. Use Add to add.");
         }
         DnValueDictionary[attributeName] = value;
+        return this;
     }
 
-    public void Set(string attributeName, decimal value, bool existingOnly = false)
+    public Attributes Set(string attributeName, decimal value, bool existingOnly = false)
     {
         attributeName = ValidateAttributeName(attributeName);
         if (DnValueDictionary.Count >= System.AttributesCountLimit && !DnValueDictionary.ContainsKey(attributeName))
@@ -92,9 +94,10 @@ public record Attributes(Dictionary<string, DnValue> DnValueDictionary, IParentD
             throw new InvalidOperationException($"Attribute '{attributeName}' does not exist. Use Add to add.");
         }
         DnValueDictionary[attributeName] = value;
+        return this;
     }
 
-    public void Add(string attributeName, string value)
+    public Attributes Add(string attributeName, string value)
     {
         attributeName = ValidateAttributeName(attributeName);
         if ( value.Length > System.StringValueLengthLimit)
@@ -105,45 +108,37 @@ public record Attributes(Dictionary<string, DnValue> DnValueDictionary, IParentD
         {
             throw new InvalidOperationException($"Attributes count exceeds the limit of {System.AttributesCountLimit}.");
         }
-        if (Contains(attributeName))
-        {
-            throw new InvalidOperationException($"Attribute '{attributeName}' already exists. Use Set to overwrite.");
-        }
-        DnValueDictionary[attributeName] = value;
+        DnValueDictionary.Add(attributeName, value);
+        return this;
     }
 
-    public void Add(string attributeName, int value)
+    public Attributes Add(string attributeName, int value)
     {
         attributeName = ValidateAttributeName(attributeName);
         if (DnValueDictionary.Count >= System.AttributesCountLimit && !DnValueDictionary.ContainsKey(attributeName))
         {
             throw new InvalidOperationException($"Attributes count exceeds the limit of {System.AttributesCountLimit}.");
         }
-        if (Contains(attributeName))
-        {
-            throw new InvalidOperationException($"Attribute '{attributeName}' already exists. Use Set to overwrite.");
-        }
-        DnValueDictionary[attributeName] = value;
+        DnValueDictionary.Add(attributeName, value);
+        return this;
     }
 
-    public void Add(string attributeName, decimal value)
+    public Attributes Add(string attributeName, decimal value)
     {
         attributeName = ValidateAttributeName(attributeName);
         if (DnValueDictionary.Count >= System.AttributesCountLimit && !DnValueDictionary.ContainsKey(attributeName))
         {
             throw new InvalidOperationException($"Attributes count exceeds the limit of {System.AttributesCountLimit}.");
         }
-        if (Contains(attributeName))
-        {
-            throw new InvalidOperationException($"Attribute '{attributeName}' already exists. Use Set to overwrite.");
-        }
-        DnValueDictionary[attributeName] = value;
+        DnValueDictionary.Add(attributeName, value);
+        return this;
     }
 
-    public void Remove(string attributeName)
+    public Attributes Remove(string attributeName)
     {
         attributeName = ValidateAttributeName(attributeName);
         DnValueDictionary.Remove(attributeName);
+        return this;
     }
 
     public bool Contains(string attributeName)

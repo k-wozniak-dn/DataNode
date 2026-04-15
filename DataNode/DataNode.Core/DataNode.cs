@@ -55,7 +55,30 @@ public class DataNode : IParentDataNode
         return Keys.ContainsKey(key);
     }
 
-    public void Set(string key, Attributes attributes)
+    public DataNode Set(string key, Attributes attributes, bool existingOnly = false)
+    {
+        key = ValidateKey(key);
+
+        if (key.Length > System.KeyLengthLimit)
+        {
+            throw new ArgumentException($"Key length exceeds the limit of {System.KeyLengthLimit} characters.");
+        }
+        if (CountNonSys >= System.KeysCountLimit && !ContainsKey(key))
+        {
+            throw new InvalidOperationException($"Keys count exceeds the limit of {System.KeysCountLimit}.");
+        }
+        if (existingOnly && !ContainsKey(key))
+        {
+            throw new KeyNotFoundException($"Key '{key}' not found. Use Add to create new key.");
+        }
+        attributes.Key = key;
+        attributes.Parent = this;
+        Keys[key] = attributes;
+        SetIndex(key);
+        return this;
+    }
+
+    public DataNode Add(string key, Attributes attributes)
     {
         key = ValidateKey(key);
 
@@ -69,8 +92,9 @@ public class DataNode : IParentDataNode
         }
         attributes.Key = key;
         attributes.Parent = this;
-        Keys[key] = attributes;
+        Keys.Add(key, attributes);
         SetIndex(key);
+        return this;
     }
 
     public Attributes? Get(string key)
@@ -99,7 +123,7 @@ public class DataNode : IParentDataNode
         else
         {
             attributes = Attributes.Create(this, key);
-            Set(key, attributes);
+            Add(key, attributes);
             return attributes;
         }
     }
@@ -121,22 +145,61 @@ public class DataNode : IParentDataNode
 
     #region Attribute
 
-    public void Set(string key, string attributeName, string value)
+    public void Set(string key, string attributeName, string value, bool existingOnly = false)
     {
-        var attributes = GetOrCreate(key);
-        attributes.Set(attributeName, value);
+        var attributes = existingOnly ? Get(key) : GetOrCreate(key);
+        if (attributes != null)
+        {
+            attributes.Set(attributeName, value, existingOnly);
+        }
+        else
+        {
+            throw new KeyNotFoundException($"Key '{key}' not found. Use Add to create new key.");
+        }
     }
 
-    public void Set(string key, string attributeName, int value)
+    public void Set(string key, string attributeName, int value, bool existingOnly = false)
     {
-        var attributes = GetOrCreate(key);
-        attributes.Set(attributeName, value);
+        var attributes = existingOnly ? Get(key) : GetOrCreate(key);
+        if (attributes != null)
+        {
+            attributes.Set(attributeName, value, existingOnly);
+        }
+        else
+        {
+            throw new KeyNotFoundException($"Key '{key}' not found. Use Add to create new key.");
+        }
     }
 
-    public void Set(string key, string attributeName, decimal value)
+    public void Set(string key, string attributeName, decimal value, bool existingOnly = false)
+    {
+        var attributes = existingOnly ? Get(key) : GetOrCreate(key);
+        if (attributes != null)
+        {
+            attributes.Set(attributeName, value, existingOnly);
+        }
+        else
+        {
+            throw new KeyNotFoundException($"Key '{key}' not found. Use Add to create new key.");
+        }
+    }
+
+    public void Add(string key, string attributeName, string value)
     {
         var attributes = GetOrCreate(key);
-        attributes.Set(attributeName, value);
+        attributes.Add(attributeName, value);
+    }
+
+    public void Add(string key, string attributeName, int value)
+    {
+        var attributes = GetOrCreate(key);
+        attributes.Add(attributeName, value);
+    }
+
+    public void Add(string key, string attributeName, decimal value)
+    {
+        var attributes = GetOrCreate(key);
+        attributes.Add(attributeName, value);
     }
 
     public DnValue? Get(string key, string attributeName)
@@ -354,7 +417,7 @@ public class DataNode : IParentDataNode
 
         foreach (var kvp in import)
         {
-            Set(kvp.Key, kvp.Value);
+            Add(kvp.Key, kvp.Value);
         }
 
         ClearIndexAttributes();
