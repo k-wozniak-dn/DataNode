@@ -71,8 +71,14 @@ public class DataNode : IParentDataNode
         {
             throw new KeyNotFoundException($"Key '{key}' not found. Use Add to create new key.");
         }
-        attributes.Key = key;
-        attributes.Parent = this;
+        if (attributes.Parent != this)
+        {
+            attributes = attributes.Copy(this, key);
+        }
+        if (attributes.Key != key)
+        {
+            attributes.Key = key;
+        }
         Keys[key] = attributes;
         SetIndex(key);
         return this;
@@ -90,8 +96,14 @@ public class DataNode : IParentDataNode
         {
             throw new InvalidOperationException($"Keys count exceeds the limit of {System.KeysCountLimit}.");
         }
-        attributes.Key = key;
-        attributes.Parent = this;
+        if (attributes.Parent != this)
+        {
+            attributes = attributes.Copy(this, key);
+        }
+        if (attributes.Key != key)
+        {
+            attributes.Key = key;
+        }
         Keys.Add(key, attributes);
         SetIndex(key);
         return this;
