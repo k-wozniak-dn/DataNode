@@ -1,4 +1,6 @@
 ﻿
+using System.Text.Json;
+
 namespace DataNode.Core;
 
 public interface IParentDataNode
@@ -36,7 +38,7 @@ public class DataNode : IParentDataNode
         .OrderBy(kvp => kvp.Key);
 
         var nonIndexed = Keys
-        .Where(kvp => !Index.Contains(kvp.Key) && !kvp.Key.StartsWith(System.SysPrefix))
+        .Where(kvp => kvp.Key.StartsWith(System.NoIndexPrefix))
         .OrderBy(kvp => kvp.Key);
 
         var indexed = Keys
@@ -220,7 +222,7 @@ public class DataNode : IParentDataNode
             return -1; // System keys are not indexed
         }
 
-        if (Contains(SysKeys.NoIndex, key))
+        if (key.StartsWith(System.NoIndexPrefix))
         {
             return -1; // Key is not indexed
         }
@@ -303,18 +305,6 @@ public class DataNode : IParentDataNode
         return MoveToIndex(key, newIndex);
     }
 
-    public void SetUnindexed(string key)
-    {
-        Set(SysKeys.NoIndex, key, 1);
-        RemoveIndex(key);
-    }
-
-    public int SetIndexed(string key)
-    {
-        Remove(SysKeys.NoIndex, key);
-        return SetIndex(key);
-    }
-
     public void SetIndexAttributes()
     {
         Index.ForEach(key => Set(key, SysAttributes.Position, Index.IndexOf(key)));
@@ -328,7 +318,8 @@ public class DataNode : IParentDataNode
     #endregion
 
     #region Export and Import
-    public IEnumerable<KeyValuePair<string, Attributes>> Export()
+
+    public IEnumerable<KeyValuePair<string, Attributes>> ExportKeys()
     {
         SetIndexAttributes();
         var result = GetAll();
@@ -336,7 +327,7 @@ public class DataNode : IParentDataNode
         return result;
     }
 
-    public void Import(IEnumerable<KeyValuePair<string, Attributes>> data)
+    public void ImportKeys(IEnumerable<KeyValuePair<string, Attributes>> data)
     {
         Clear();
 
@@ -345,22 +336,117 @@ public class DataNode : IParentDataNode
         .OrderBy(kvp => kvp.Key);
 
         var nonIndexed = data
-        .Where(kvp => !kvp.Key.StartsWith(System.SysPrefix) && !kvp.Value.Contains(SysAttributes.Position))
+        .Where(kvp => kvp.Key.StartsWith(System.NoIndexPrefix))
         .OrderBy(kvp => kvp.Key);
 
         var indexed = data
-        .Where(kvp => !kvp.Key.StartsWith(System.SysPrefix) && kvp.Value.Contains(SysAttributes.Position))
+        .Where(kvp => kvp.Value.Contains(SysAttributes.Position)) 
         .OrderBy(kvp => kvp.Value.GetInteger(SysAttributes.Position));
 
-        var import = sys.Concat(nonIndexed).Concat(indexed).ToArray();
+        var other = data
+        .Where(kvp => 
+            !kvp.Key.StartsWith(System.SysPrefix) && 
+            !kvp.Key.StartsWith(System.NoIndexPrefix) && 
+            !kvp.Value.Contains(SysAttributes.Position))
+        .OrderBy(kvp => kvp.Key);
+
+        var import = sys.Concat(nonIndexed).Concat(indexed).Concat(other).ToArray();
 
         foreach (var kvp in import)
         {
-            var attributes = kvp.Value.Copy(this, kvp.Key);
-            Set(kvp.Key, attributes);
+            Set(kvp.Key, kvp.Value);
         }
 
         ClearIndexAttributes();
     }
+
+    public string ExportJson()
+    {
+        // Convert to a dictionary for cleaner JSON structure
+        var jsonObject = new Dictionary<string, Dictionary<string, object>>();
+
+        foreach (var kvp in ExportKeys())
+        {
+            var attributesDict = new Dictionary<string, object>();
+            foreach (var attr in kvp.Value.All())
+            {
+                // Extract the value from DnValue
+                object? value = null;
+                if (attr.Value is StringValue sv)
+                {
+                    value = sv.Value;
+                }
+                else if (attr.Value is IntegerValue iv)
+                {
+                    value = iv.Value;
+                }
+                else if (attr.Value is DecimalValue dv)
+                {
+                    value = dv.Value;
+                }
+                if (value != null)
+                {
+                    attributesDict[attr.Key] = value;
+                }
+            }
+            jsonObject[kvp.Key] = attributesDict;
+        }
+        return JsonSerializer.Serialize(jsonObject, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    public DataNode ImportJson(string json)
+    {
+        var jsonObject = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, JsonElement>>>(json) 
+            ?? throw new ArgumentException("Invalid JSON format.");
+
+        var data = new Dictionary<string, Attributes>();
+
+        foreach (var kvp in jsonObject)
+        {
+            var key = kvp.Key;
+            var attributesData = kvp.Value;
+            var attributes = Attributes.Create(this, key);
+
+            foreach (var attrKvp in attributesData)
+            {
+                var attributeName = attrKvp.Key;
+                var jsonValue = attrKvp.Value;
+
+                try
+                {
+                    // Determine the type and set the appropriate value
+                    if (jsonValue.ValueKind == JsonValueKind.Number)
+                    {
+                        // Try to parse as int first, then decimal
+                        if (jsonValue.TryGetInt32(out int intValue))
+                        {
+                            attributes.Set(attributeName, intValue);
+                        }
+                        else if (jsonValue.TryGetDecimal(out decimal decimalValue))
+                        {
+                            attributes.Set(attributeName, decimalValue);
+                        }
+                    }
+                    else if (jsonValue.ValueKind == JsonValueKind.String)
+                    {
+                        var stringValue = jsonValue.GetString();
+                        if (stringValue != null)
+                        {
+                            attributes.Set(attributeName, stringValue);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Error importing attribute '{attributeName}' for key '{key}': {ex.Message}", ex);
+                }
+            }
+            data[key] = attributes;
+        }
+
+        ImportKeys(data);
+        return this;
+    }
+
     #endregion
 }

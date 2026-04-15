@@ -3,6 +3,7 @@ namespace DataNode.Core;
 public static class System
 {
     public const string SysPrefix = "*";
+    public const string NoIndexPrefix = "_";
     public const short AttributeNameLengthLimit = 64;
     public const short AttributesCountLimit = 16;
     public const short StringValueLengthLimit = 256;
@@ -13,9 +14,7 @@ public static class System
 public static class SysKeys
 {
     public const string Id = $"{System.SysPrefix}ID";
-    public const string NoIndex = $"{System.SysPrefix}NO-INDEX-KEYS";
-
-    public static readonly HashSet<string> All = [Id, NoIndex];
+    public static readonly HashSet<string> All = [Id];
 }
 
 public static class SysAttributes
