@@ -5,6 +5,7 @@ namespace DataNode.Core;
 
 public interface IParentDataNode
 {
+    int GetIndex(string key);
 }
 
 public class DataNode : IParentDataNode
@@ -14,9 +15,9 @@ public class DataNode : IParentDataNode
     }
 
     #region Properties and Fields
-    private readonly Dictionary<string, Attributes> Keys = new([]);
+    private readonly Dictionary<string, Item> Keys = new([]);
     private readonly List<string> Index = new([]);
-    public int CountNonSys { get { return Keys.Count(kvp => !kvp.Key.StartsWith(System.SysPrefix)) ;} }  
+    public int CountNonSys { get { return Keys.Count(kvp => !kvp.Key.StartsWith(System.SysKeyPrefix)) ;} }  
 
     #endregion
 
@@ -31,14 +32,14 @@ public class DataNode : IParentDataNode
         return key.ToUpper();
     }
    
-    public IEnumerable<KeyValuePair<string, Attributes>> GetAll()
+    public IEnumerable<KeyValuePair<string, Item>> GetAll()
     {
         var sys = Keys
-        .Where(kvp => kvp.Key.StartsWith(System.SysPrefix))
+        .Where(kvp => kvp.Key.StartsWith(System.SysKeyPrefix))
         .OrderBy(kvp => kvp.Key);
 
         var nonIndexed = Keys
-        .Where(kvp => kvp.Key.StartsWith(System.NoIndexPrefix))
+        .Where(kvp => kvp.Key.StartsWith(System.NoIndexKeyPrefix))
         .OrderBy(kvp => kvp.Key);
 
         var indexed = Keys
@@ -55,7 +56,7 @@ public class DataNode : IParentDataNode
         return Keys.ContainsKey(key);
     }
 
-    public DataNode Set(string key, Attributes attributes, bool existingOnly = false)
+    public DataNode Set(string key, Item item, bool existingOnly = false)
     {
         key = ValidateKey(key);
 
@@ -63,28 +64,25 @@ public class DataNode : IParentDataNode
         {
             throw new ArgumentException($"Key length exceeds the limit of {System.KeyLengthLimit} characters.");
         }
-        if (CountNonSys >= System.KeysCountLimit && !ContainsKey(key))
+        if (CountNonSys >= System.ItemsCountLimit && !ContainsKey(key))
         {
-            throw new InvalidOperationException($"Keys count exceeds the limit of {System.KeysCountLimit}.");
+            throw new InvalidOperationException($"Keys count exceeds the limit of {System.ItemsCountLimit}.");
         }
         if (existingOnly && !ContainsKey(key))
         {
             throw new KeyNotFoundException($"Key '{key}' not found. Use Add to create new key.");
         }
-        if (attributes.Parent != this)
+        if (item.Parent != this)
         {
-            attributes = attributes.Copy(this, key);
+            item = item.Copy(key, this );
         }
-        if (attributes.Key != key)
-        {
-            attributes.Key = key;
-        }
-        Keys[key] = attributes;
+
+        Keys[key] = item;
         SetIndex(key);
         return this;
     }
 
-    public DataNode Add(string key, Attributes attributes)
+    public DataNode Add(string key, Item attributes)
     {
         key = ValidateKey(key);
 
@@ -92,28 +90,24 @@ public class DataNode : IParentDataNode
         {
             throw new ArgumentException($"Key length exceeds the limit of {System.KeyLengthLimit} characters.");
         }
-        if (CountNonSys >= System.KeysCountLimit && !ContainsKey(key))
+        if (CountNonSys >= System.ItemsCountLimit && !ContainsKey(key))
         {
-            throw new InvalidOperationException($"Keys count exceeds the limit of {System.KeysCountLimit}.");
+            throw new InvalidOperationException($"Keys count exceeds the limit of {System.ItemsCountLimit}.");
         }
         if (attributes.Parent != this)
         {
-            attributes = attributes.Copy(this, key);
-        }
-        if (attributes.Key != key)
-        {
-            attributes.Key = key;
+            attributes = attributes.Copy( key, this);
         }
         Keys.Add(key, attributes);
         SetIndex(key);
         return this;
     }
 
-    public Attributes? Get(string key)
+    public Item? Get(string key)
     {
         key = ValidateKey(key);
 
-        if (Keys.TryGetValue(key, out Attributes? attributes))
+        if (Keys.TryGetValue(key, out Item? attributes))
         {
             return attributes;
         }
@@ -123,7 +117,7 @@ public class DataNode : IParentDataNode
         }
     }
 
-    public Attributes GetOrCreate(string key)
+    public Item GetOrCreate(string key)
     {
         key = ValidateKey(key);
 
@@ -134,7 +128,7 @@ public class DataNode : IParentDataNode
         }
         else
         {
-            attributes = Attributes.Create(this, key);
+            attributes = new Item(key, this);
             Add(key, attributes);
             return attributes;
         }
@@ -288,16 +282,21 @@ public class DataNode : IParentDataNode
     #endregion
 
     #region Index
+
+    public int GetIndex(string key)
+    {
+        return Index.IndexOf(key);
+    }
     public int SetIndex(string key)
     {
         key = ValidateKey(key);
 
-        if (key.StartsWith(System.SysPrefix))
+        if (key.StartsWith(System.SysKeyPrefix))
         {
             return -1; // System keys are not indexed
         }
 
-        if (key.StartsWith(System.NoIndexPrefix))
+        if (key.StartsWith(System.NoIndexKeyPrefix))
         {
             return -1; // Key is not indexed
         }
@@ -382,19 +381,19 @@ public class DataNode : IParentDataNode
 
     public void SetIndexAttributes()
     {
-        Index.ForEach(key => Set(key, SysAttributes.Position, Index.IndexOf(key)));
+        Index.ForEach(key => Set(key, SystemAttributes.Position, Index.IndexOf(key)));
     }
 
     public void ClearIndexAttributes()
     {
-        GetAll().Where(kvp => kvp.Value.Contains(SysAttributes.Position)).ToList()
-        .ForEach(kvp => Remove(kvp.Key, SysAttributes.Position));
+        GetAll().Where(kvp => kvp.Value.Contains(SystemAttributes.Position)).ToList()
+        .ForEach(kvp => Remove(kvp.Key, SystemAttributes.Position));
     }
     #endregion
 
     #region Export and Import
 
-    public IEnumerable<KeyValuePair<string, Attributes>> ExportKeys()
+    public IEnumerable<KeyValuePair<string, Item>> ExportKeys()
     {
         SetIndexAttributes();
         var result = GetAll();
@@ -402,27 +401,27 @@ public class DataNode : IParentDataNode
         return result;
     }
 
-    public void ImportKeys(IEnumerable<KeyValuePair<string, Attributes>> data)
+    public void ImportKeys(IEnumerable<KeyValuePair<string, Item>> data)
     {
         Clear();
 
         var sys = data
-        .Where(kvp => kvp.Key.StartsWith(System.SysPrefix))
+        .Where(kvp => kvp.Key.StartsWith(System.SysKeyPrefix))
         .OrderBy(kvp => kvp.Key);
 
         var nonIndexed = data
-        .Where(kvp => kvp.Key.StartsWith(System.NoIndexPrefix))
+        .Where(kvp => kvp.Key.StartsWith(System.NoIndexKeyPrefix))
         .OrderBy(kvp => kvp.Key);
 
         var indexed = data
-        .Where(kvp => kvp.Value.Contains(SysAttributes.Position)) 
-        .OrderBy(kvp => kvp.Value.GetInteger(SysAttributes.Position));
+        .Where(kvp => kvp.Value.Contains(SystemAttributes.Position)) 
+        .OrderBy(kvp => kvp.Value.GetInteger(SystemAttributes.Position));
 
         var other = data
         .Where(kvp => 
-            !kvp.Key.StartsWith(System.SysPrefix) && 
-            !kvp.Key.StartsWith(System.NoIndexPrefix) && 
-            !kvp.Value.Contains(SysAttributes.Position))
+            !kvp.Key.StartsWith(System.SysKeyPrefix) && 
+            !kvp.Key.StartsWith(System.NoIndexKeyPrefix) && 
+            !kvp.Value.Contains(SystemAttributes.Position))
         .OrderBy(kvp => kvp.Key);
 
         var import = sys.Concat(nonIndexed).Concat(indexed).Concat(other).ToArray();
@@ -443,7 +442,7 @@ public class DataNode : IParentDataNode
         foreach (var kvp in ExportKeys())
         {
             var attributesDict = new Dictionary<string, object>();
-            foreach (var attr in kvp.Value.All())
+            foreach (var attr in kvp.Value.GetAll())
             {
                 // Extract the value from DnValue
                 object? value = null;
@@ -474,13 +473,13 @@ public class DataNode : IParentDataNode
         var jsonObject = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, JsonElement>>>(json) 
             ?? throw new ArgumentException("Invalid JSON format.");
 
-        var data = new Dictionary<string, Attributes>();
+        var data = new Dictionary<string, Item>();
 
         foreach (var kvp in jsonObject)
         {
             var key = kvp.Key;
             var attributesData = kvp.Value;
-            var attributes = Attributes.Create(this, key);
+            var attributes =  new Item(key, this);
 
             foreach (var attrKvp in attributesData)
             {
