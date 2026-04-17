@@ -3,7 +3,7 @@ namespace DataNode.Core;
 public class Item(Dictionary<string, DnValue> attributes, string key, IParentDataNode? parent = null)
 {
     #region Properties
-    Dictionary<string, DnValue> Attributes { get; } = attributes;
+    public Dictionary<string, DnValue> Attributes { get; } = attributes;
     public string Key { get; } = ValidateKey(key);
     public IParentDataNode? Parent { get; set; } = parent;
     public int? Index
@@ -98,6 +98,11 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         return value is DecimalValue decimalValue ? decimalValue.Value : null;
     }
 
+    public IEnumerable<KeyValuePair<string, DnValue>> GetAll()
+    {
+        return [.. Attributes.Select(kvp => new KeyValuePair<string, DnValue>(kvp.Key, kvp.Value))];
+    }
+    
     #endregion
 
     #region Set
@@ -224,9 +229,9 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         return this;
     }
 
-    public Item AddAll(Dictionary<string, object> values)
+    public Item AddAll(Dictionary<string, object> attributes)
     {
-        foreach (var kvp in values)
+        foreach (var kvp in attributes)
         {
             if (kvp.Value is string stringValue)
             {
@@ -261,11 +266,6 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
     {
         attributeName = ValidateAttributeName(attributeName);
         return Attributes.ContainsKey(attributeName);
-    }
-
-    public IEnumerable<KeyValuePair<string, DnValue>> GetAll()
-    {
-        return [.. Attributes.Select(kvp => new KeyValuePair<string, DnValue>(kvp.Key, kvp.Value))];
     }
 
     public Item Copy(string key, IParentDataNode? parent)
