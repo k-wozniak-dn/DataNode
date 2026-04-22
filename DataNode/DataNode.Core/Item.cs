@@ -21,7 +21,7 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
     }
 
     #region Validate
-    private static string ValidateKey(string key)
+    public static string ValidateKey(string key)
     {
         if (key.Length > System.KeyLengthLimit)
         {
@@ -67,6 +67,11 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
     #endregion
 
     #region Get
+    public Dictionary<string, DnValue> Get()
+    {
+        return Attributes.OrderBy(kvp => kvp.Key).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+    }    
+    
     public DnValue? Get(string attributeName)
     {
         attributeName = ValidateAttributeName(attributeName);
@@ -98,11 +103,6 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         return value is DecimalValue decimalValue ? decimalValue.Value : null;
     }
 
-    public IEnumerable<KeyValuePair<string, DnValue>> GetAll()
-    {
-        return [.. Attributes.Select(kvp => new KeyValuePair<string, DnValue>(kvp.Key, kvp.Value))];
-    }
-    
     #endregion
 
     #region Set
@@ -113,7 +113,45 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         ValidateAttributeCount(attributeName);
         ValidateSetExisting(attributeName, existingOnly);
 
+        var existing = Attributes.ContainsKey(attributeName);
+        var systemAttribute = SystemAttributes.All.Contains(attributeName);
+
+        if (systemAttribute && existing)
+        {
+            OnBeforeSystemAttributeSet(attributeName);
+        }
+        else if (systemAttribute && !existing)
+        {
+            OnBeforeSystemAttributeAdd(attributeName);
+        }
+        else if (!systemAttribute && existing)
+        {
+            OnBeforeAttributeSet(attributeName);
+        }
+        else if (!systemAttribute && !existing)
+        {
+            OnBeforeAttributeAdd(attributeName);
+        }
+
         Attributes[attributeName] = value;
+
+        if (systemAttribute && existing)
+        {
+            OnAfterSystemAttributeSet(attributeName);
+        }
+        else if (systemAttribute && !existing)
+        {
+            OnAfterSystemAttributeAdd(attributeName);
+        }
+        else if (!systemAttribute && existing)
+        {
+            OnAfterAttributeSet(attributeName);
+        }
+        else if (!systemAttribute && !existing)
+        {
+            OnAfterAttributeAdd(attributeName);
+        }
+
         return this;
     }
 
@@ -123,7 +161,44 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         ValidateAttributeCount(attributeName);
         ValidateSetExisting(attributeName, existingOnly);
 
+        var existing = Attributes.ContainsKey(attributeName);
+        var systemAttribute = SystemAttributes.All.Contains(attributeName);
+
+        if (systemAttribute && existing)
+        {
+            OnBeforeSystemAttributeSet(attributeName);
+        }
+        else if (systemAttribute && !existing)
+        {
+            OnBeforeSystemAttributeAdd(attributeName);
+        }
+        else if (!systemAttribute && existing)
+        {
+            OnBeforeAttributeSet(attributeName);
+        }
+        else if (!systemAttribute && !existing)
+        {
+            OnBeforeAttributeAdd(attributeName);
+        }
+
         Attributes[attributeName] = value;
+
+        if (systemAttribute && existing)
+        {
+            OnAfterSystemAttributeSet(attributeName);
+        }
+        else if (systemAttribute && !existing)
+        {
+            OnAfterSystemAttributeAdd(attributeName);
+        }
+        else if (!systemAttribute && existing)
+        {
+            OnAfterAttributeSet(attributeName);
+        }
+        else if (!systemAttribute && !existing)
+        {
+            OnAfterAttributeAdd(attributeName);
+        }
         return this;
     }
 
@@ -133,7 +208,44 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         ValidateAttributeCount(attributeName);
         ValidateSetExisting(attributeName, existingOnly);
 
+        var existing = Attributes.ContainsKey(attributeName);
+        var systemAttribute = SystemAttributes.All.Contains(attributeName);
+
+        if (systemAttribute && existing)
+        {
+            OnBeforeSystemAttributeSet(attributeName);
+        }
+        else if (systemAttribute && !existing)
+        {
+            OnBeforeSystemAttributeAdd(attributeName);
+        }
+        else if (!systemAttribute && existing)
+        {
+            OnBeforeAttributeSet(attributeName);
+        }
+        else if (!systemAttribute && !existing)
+        {
+            OnBeforeAttributeAdd(attributeName);
+        }
+
         Attributes[attributeName] = value;
+
+        if (systemAttribute && existing)
+        {
+            OnAfterSystemAttributeSet(attributeName);
+        }
+        else if (systemAttribute && !existing)
+        {
+            OnAfterSystemAttributeAdd(attributeName);
+        }
+        else if (!systemAttribute && existing)
+        {
+            OnAfterAttributeSet(attributeName);
+        }
+        else if (!systemAttribute && !existing)
+        {
+            OnAfterAttributeAdd(attributeName);
+        }
         return this;
     }
 
@@ -143,7 +255,44 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         ValidateAttributeCount(attributeName);
         ValidateSetExisting(attributeName, existingOnly);
 
+        var existing = Attributes.ContainsKey(attributeName);
+        var systemAttribute = SystemAttributes.All.Contains(attributeName);
+
+        if (systemAttribute && existing)
+        {
+            OnBeforeSystemAttributeSet(attributeName);
+        }
+        else if (systemAttribute && !existing)
+        {
+            OnBeforeSystemAttributeAdd(attributeName);
+        }
+        else if (!systemAttribute && existing)
+        {
+            OnBeforeAttributeSet(attributeName);
+        }
+        else if (!systemAttribute && !existing)
+        {
+            OnBeforeAttributeAdd(attributeName);
+        }
+
         Attributes[attributeName] = value;
+
+        if (systemAttribute && existing)
+        {
+            OnAfterSystemAttributeSet(attributeName);
+        }
+        else if (systemAttribute && !existing)
+        {
+            OnAfterSystemAttributeAdd(attributeName);
+        }
+        else if (!systemAttribute && existing)
+        {
+            OnAfterAttributeSet(attributeName);
+        }
+        else if (!systemAttribute && !existing)
+        {
+            OnAfterAttributeAdd(attributeName);
+        }
         return this;
     }
 
@@ -189,7 +338,27 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         value = ValidateStringValue(value);
         ValidateAttributeCount(attributeName);
 
+        var systemAttribute = SystemAttributes.All.Contains(attributeName);
+
+        if (systemAttribute)
+        {
+            OnBeforeSystemAttributeAdd(attributeName);
+        }
+        else
+        {
+            OnBeforeAttributeAdd(attributeName);
+        }
+
         Attributes.Add(attributeName, value);
+
+        if (systemAttribute)
+        {
+            OnAfterSystemAttributeAdd(attributeName);
+        }
+        else
+        {
+            OnAfterAttributeAdd(attributeName);
+        }
         return this;
     }
 
@@ -198,7 +367,27 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         attributeName = ValidateAttributeName(attributeName);
         ValidateAttributeCount(attributeName);
 
+        var systemAttribute = SystemAttributes.All.Contains(attributeName);
+
+        if (systemAttribute)
+        {
+            OnBeforeSystemAttributeAdd(attributeName);
+        }
+        else
+        {
+            OnBeforeAttributeAdd(attributeName);
+        }
+
         Attributes.Add(attributeName, value);
+
+        if (systemAttribute)
+        {
+            OnAfterSystemAttributeAdd(attributeName);
+        }
+        else
+        {
+            OnAfterAttributeAdd(attributeName);
+        }
         return this;
     }
 
@@ -207,7 +396,27 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         attributeName = ValidateAttributeName(attributeName);
         ValidateAttributeCount(attributeName);
 
+        var systemAttribute = SystemAttributes.All.Contains(attributeName);
+
+        if (systemAttribute)
+        {
+            OnBeforeSystemAttributeAdd(attributeName);
+        }
+        else
+        {
+            OnBeforeAttributeAdd(attributeName);
+        }
+
         Attributes.Add(attributeName, value);
+
+        if (systemAttribute)
+        {
+            OnAfterSystemAttributeAdd(attributeName);
+        }
+        else
+        {
+            OnAfterAttributeAdd(attributeName);
+        }
         return this;
     }
 
@@ -216,7 +425,27 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         attributeName = ValidateAttributeName(attributeName);
         ValidateAttributeCount(attributeName);
 
+        var systemAttribute = SystemAttributes.All.Contains(attributeName);
+
+        if (systemAttribute)
+        {
+            OnBeforeSystemAttributeAdd(attributeName);
+        }
+        else
+        {
+            OnBeforeAttributeAdd(attributeName);
+        }
+
         Attributes.Add(attributeName, value);
+
+        if (systemAttribute)
+        {
+            OnAfterSystemAttributeAdd(attributeName);
+        }
+        else
+        {
+            OnAfterAttributeAdd(attributeName);
+        }
         return this;
     }
 
@@ -258,9 +487,114 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
     public Item Remove(string attributeName)
     {
         attributeName = ValidateAttributeName(attributeName);
+
+        var systemAttribute = SystemAttributes.All.Contains(attributeName);
+
+        if (systemAttribute)
+        {
+            OnBeforeSystemAttributeRemove(attributeName);
+        }
+        else
+        {
+            OnBeforeAttributeRemove(attributeName);
+        }
+
         Attributes.Remove(attributeName);
+
+        if (systemAttribute)
+        {
+            OnAfterSystemAttributeRemove(attributeName);
+        }
+        else
+        {
+            OnAfterAttributeRemove(attributeName);
+        }
+
         return this;
     }
+
+    #region System Handlers
+
+    protected virtual void OnBeforeSystemAttributeSet(string attributeName)
+    {
+
+    }
+
+    protected virtual void OnAfterSystemAttributeSet(string attributeName)
+    {
+        switch (attributeName)
+        {
+            case SystemAttributes.Unindexed:
+                Parent?.RemoveIndex(Key);
+                break;
+        }
+    }
+
+    protected virtual void OnBeforeSystemAttributeAdd(string attributeName)
+    {
+
+    }
+
+    protected virtual void OnAfterSystemAttributeAdd(string attributeName)
+    {
+        switch (attributeName)
+        {
+            case SystemAttributes.Unindexed:
+                Parent?.RemoveIndex(Key);
+                break;
+        }
+    }
+
+    protected virtual void OnBeforeSystemAttributeRemove(string attributeName)
+    {
+
+    }
+
+    protected virtual void OnAfterSystemAttributeRemove(string attributeName)
+    {
+        switch (attributeName)
+        {
+            case SystemAttributes.Unindexed:
+                Parent?.SetIndex(Key);
+                break;
+        }
+    }
+
+    #endregion
+
+    #region Handlers
+
+    protected virtual void OnBeforeAttributeSet(string attributeName)
+    {
+
+    }
+
+    protected virtual void OnAfterAttributeSet(string attributeName)
+    {
+
+    }
+
+    protected virtual void OnBeforeAttributeAdd(string attributeName)
+    {
+
+    }
+
+    protected virtual void OnAfterAttributeAdd(string attributeName)
+    {
+
+    }
+
+    protected virtual void OnBeforeAttributeRemove(string attributeName)
+    {
+
+    }
+
+    protected virtual void OnAfterAttributeRemove(string attributeName)
+    {
+
+    }
+
+    #endregion
 
     public bool Contains(string attributeName)
     {

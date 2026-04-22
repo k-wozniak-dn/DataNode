@@ -21,12 +21,12 @@ public class UnitTest1
         item2.Set("Brand", "Sunny");
         item2.Set("Quantity", 20);
 
-        dataNode.Set("item1", item1);
-        dataNode.Set("item2", item2);
+        dataNode.Set(item1);
+        dataNode.Set(item2);
 
         // Assert
-        var count = dataNode.GetAll().Sum(kvp => kvp.Value.Count());
-        var total = dataNode.GetAll().Sum(kvp => kvp.Value.GetDecimal("Price") * kvp.Value.GetInteger("Quantity"));
+        var count = dataNode.Get().Sum(kvp => kvp.Value.Count());
+        var total = dataNode.Get().Sum(kvp => kvp.Value.GetDecimal("Price") * kvp.Value.GetInteger("Quantity"));
         Assert.Equal(7, count); 
         Assert.Equal(45m, total); 
     }
@@ -50,8 +50,8 @@ public class UnitTest1
         item2.Set("Quantity", 20);
 
         // Assert
-        var count = dataNode.GetAll().Sum(kvp => kvp.Value.Count());
-        var total = dataNode.GetAll().Sum(kvp => kvp.Value.GetDecimal("Price") * kvp.Value.GetInteger("Quantity"));
+        var count = dataNode.Get().Sum(kvp => kvp.Value.Count());
+        var total = dataNode.Get().Sum(kvp => kvp.Value.GetDecimal("Price") * kvp.Value.GetInteger("Quantity"));
         Assert.Equal(7, count); 
         Assert.Equal(45m, total); 
     }
