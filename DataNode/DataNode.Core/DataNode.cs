@@ -1,4 +1,5 @@
 ﻿
+using System.Dynamic;
 using System.Text.Json;
 
 namespace DataNode.Core;
@@ -12,8 +13,13 @@ public interface IParentDataNode
 
 public class DataNode : IParentDataNode
 {
-    public DataNode() : base()
+    public DataNode()
     {
+    }
+
+    public DataNode(Dictionary<string, Item> items) : base()
+    {
+        foreach(var item in items.Values) { Add(item); }
     }
 
     #region Properties and Fields
@@ -28,6 +34,14 @@ public class DataNode : IParentDataNode
         if (Count() >= System.ItemsCountLimit && !ContainsKey(key))
         {
             throw new InvalidOperationException($"Keys count exceeds the limit of {System.ItemsCountLimit}.");
+        }
+    }
+
+    private void ValidateExisting(string key, bool existingOnly)
+    {
+        if (existingOnly && !ContainsKey(key))
+        {
+            throw new KeyNotFoundException($"Key '{key}' not found. Use Add to create new key.");
         }
     }
 
@@ -60,14 +74,10 @@ public class DataNode : IParentDataNode
         return result;
     }
     
-    public DataNode Set(Item item, bool existingOnly = false)
+    public DataNode Set(Item item, bool existingOnly = false, bool skipHandlers = false)
     {
         ValidateKeyCount(item.Key);
-
-        if (existingOnly && !ContainsKey(item.Key))
-        {
-            throw new KeyNotFoundException($"Key '{item.Key}' not found. Use Add to create new key.");
-        }
+        ValidateExisting(item.Key, existingOnly);
 
         if (item.Parent != null && item.Parent != this)
         {
@@ -75,12 +85,23 @@ public class DataNode : IParentDataNode
         }
         else item.Parent ??= this;
 
+        if (!skipHandlers) { OnBeforeItemSet(item); }
         Items[item.Key] = item;
-        SetIndex(item.Key);
+        if (!skipHandlers) { OnAfterItemSet(item); }
+
         return this;
     }
 
-    public DataNode Add(Item item)
+    public DataNode SetAll(Dictionary<string, Item> items, bool existingOnly = false, bool skipHandlers = false)
+    {
+        foreach (var item in items.Values)
+        {
+            Set(item, existingOnly, skipHandlers);
+        }
+        return this;
+    }
+
+    public DataNode Add(Item item, bool skipHandlers = false)
     {
         ValidateKeyCount(item.Key);
 
@@ -90,8 +111,19 @@ public class DataNode : IParentDataNode
         }
         else item.Parent ??= this;
 
+        if (!skipHandlers) { OnBeforeItemSet(item); }
         Items.Add(item.Key, item);
-        SetIndex(item.Key);
+        if (!skipHandlers) { OnAfterItemSet(item); }
+
+        return this;
+    }
+
+    public DataNode AddAll(Dictionary<string, Item> items, bool skipHandlers = false)
+    {
+        foreach (var item in items.Values)
+        {
+            Add(item, skipHandlers);
+        }
         return this;
     }
 
@@ -122,10 +154,14 @@ public class DataNode : IParentDataNode
         }
     }
 
-    public void Remove(string key)
+    public void Remove(string key, bool skipHandlers = false)
     {
+        ValidateExisting(key, true);
+
+        if (!skipHandlers) { OnBeforeItemRemove(Items[key]); }
         Items.Remove(key);
-        RemoveIndex(key);
+        if (!skipHandlers) { OnAfterItemRemove(Items[key]); }
+
     }
 
     public void Clear()
@@ -134,32 +170,103 @@ public class DataNode : IParentDataNode
         Index.Clear();
     }
 
+    public static DataNode Copy(DataNode from)
+    {
+        var itemsCopy = new Dictionary<string, Item>(from.Get());
+        return new DataNode(itemsCopy);
+    }
+
     #endregion
 
-    #region Index
+    #region Handlers
 
-    public int SetIndex(string key)
+    protected virtual void OnBeforeItemSet(Item item)
     {
-
-        if (key.StartsWith(System.SysKeyPrefix))
+        if (item.Key.StartsWith(System.SysKeyPrefix))
         {
-            return -1; // System keys are not indexed
-        }
-
-        if (Index.Contains(key))
-        {
-            return Index.IndexOf(key);
+            if (item.Contains(SystemAttributes.Indexed))
+            {
+                throw new InvalidOperationException($"Attribute '{SystemAttributes.Indexed}' cannot be set on system keys.");
+            }
         }
         else
         {
+        }
+    }
+
+    protected virtual void OnAfterItemSet(Item item)
+    {
+        if (item.Key.StartsWith(System.SysKeyPrefix))
+        {
+        }
+        else
+        {
+            if (item.Contains(SystemAttributes.Indexed))
+            {
+                SetIndex(item.Key);
+            }            
+        }
+    }
+
+    protected virtual void OnBeforeItemRemove(Item item)
+    {
+        if (item.Key.StartsWith(System.SysKeyPrefix))
+        {
+        }
+        else
+        {
+        }
+    }
+
+    protected virtual void OnAfterItemRemove(Item item)
+    {
+        if (item.Key.StartsWith(System.SysKeyPrefix))
+        {
+        }
+        else
+        {
+            if (item.Contains(SystemAttributes.Indexed))
+            {
+                RemoveIndex(item.Key);
+            }
+        }
+    }
+
+    #endregion
+
+    #region Index
+    private void ResetIndexedAttributes()
+    {
+        Index.ForEach(key =>
+        {
+            var item = Get(key);
+            if (item != null)
+            {
+                var idx = item.GetInteger(SystemAttributes.Indexed);
+                var currentIdx = Index.IndexOf(key);
+                if (idx != currentIdx)
+                {
+                    item.Set(SystemAttributes.Indexed, currentIdx, true, true);
+                }
+            }
+        });
+    }
+
+    public int SetIndex(string key)
+    {
+        if (!Index.Contains(key))
+        {
             Index.Add(key);
         }
+        ResetIndexedAttributes();
         return Index.IndexOf(key);
     }
 
     public bool RemoveIndex(string key)
     {
-        return Index.Remove(key);
+        var result = Index.Remove(key);
+        ResetIndexedAttributes();
+        return result;
     }
 
     private int MoveToIndex(string key, int newIndex)
@@ -175,20 +282,10 @@ public class DataNode : IParentDataNode
 
         Index.Remove(key);
         Index.Insert(newIndex, key);
+        ResetIndexedAttributes();
         return newIndex;
     }
 
-    private void SetIndexAttributes()
-    {
-        Index.ForEach(key => Get(key)?.Set(SystemAttributes.Position, Index.IndexOf(key)));
-    }
-
-    private void ClearIndexAttributes()
-    {
-        Get().Where(kvp => kvp.Value.Contains(SystemAttributes.Position)).ToList()
-        .ForEach(kvp => Get(kvp.Key)?.Remove(SystemAttributes.Position));
-    } 
- 
     public int GetIndex(string key)
     {
         return Index.IndexOf(key);
@@ -205,6 +302,7 @@ public class DataNode : IParentDataNode
 
         Index.Remove(key);
         Index.Add(key);
+        ResetIndexedAttributes();
         return Index.Count - 1;
     }
 
@@ -219,6 +317,7 @@ public class DataNode : IParentDataNode
 
         Index.Remove(key);
         Index.Insert(0, key);
+        ResetIndexedAttributes();
         return 0;
     }
 

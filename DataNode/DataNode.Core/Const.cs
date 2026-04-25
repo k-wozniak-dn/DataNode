@@ -19,7 +19,6 @@ public static class SystemKeys
 
 public static class SystemAttributes
 {
-    public const string Position = $"{System.SysAttributeNamePrefix}POS";
-    public const string Unindexed = $"{System.SysAttributeNamePrefix}UNINDEXED";
-    public static readonly HashSet<string> All = [Position, Unindexed];
+    public const string Indexed = $"{System.SysAttributeNamePrefix}IDX";
+    public static readonly HashSet<string> All = [Indexed];
 }

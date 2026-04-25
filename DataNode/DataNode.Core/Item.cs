@@ -106,220 +106,83 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
     #endregion
 
     #region Set
-    public Item Set(string attributeName, string value, bool existingOnly = false)
+    public Item Set(string attributeName, string value, bool existingOnly = false, bool skipHandlers = false)
     {
         attributeName = ValidateAttributeName(attributeName);
         value = ValidateStringValue(value);
         ValidateAttributeCount(attributeName);
         ValidateSetExisting(attributeName, existingOnly);
 
-        var existing = Attributes.ContainsKey(attributeName);
-        var systemAttribute = SystemAttributes.All.Contains(attributeName);
-
-        if (systemAttribute && existing)
-        {
-            OnBeforeSystemAttributeSet(attributeName);
-        }
-        else if (systemAttribute && !existing)
-        {
-            OnBeforeSystemAttributeAdd(attributeName);
-        }
-        else if (!systemAttribute && existing)
-        {
-            OnBeforeAttributeSet(attributeName);
-        }
-        else if (!systemAttribute && !existing)
-        {
-            OnBeforeAttributeAdd(attributeName);
-        }
-
+        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
         Attributes[attributeName] = value;
-
-        if (systemAttribute && existing)
-        {
-            OnAfterSystemAttributeSet(attributeName);
-        }
-        else if (systemAttribute && !existing)
-        {
-            OnAfterSystemAttributeAdd(attributeName);
-        }
-        else if (!systemAttribute && existing)
-        {
-            OnAfterAttributeSet(attributeName);
-        }
-        else if (!systemAttribute && !existing)
-        {
-            OnAfterAttributeAdd(attributeName);
-        }
+        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
 
         return this;
     }
 
-    public Item Set(string attributeName, int value, bool existingOnly = false)
+    public Item Set(string attributeName, int value, bool existingOnly = false, bool skipHandlers = false)
     {
         attributeName = ValidateAttributeName(attributeName);
         ValidateAttributeCount(attributeName);
         ValidateSetExisting(attributeName, existingOnly);
 
-        var existing = Attributes.ContainsKey(attributeName);
-        var systemAttribute = SystemAttributes.All.Contains(attributeName);
-
-        if (systemAttribute && existing)
-        {
-            OnBeforeSystemAttributeSet(attributeName);
-        }
-        else if (systemAttribute && !existing)
-        {
-            OnBeforeSystemAttributeAdd(attributeName);
-        }
-        else if (!systemAttribute && existing)
-        {
-            OnBeforeAttributeSet(attributeName);
-        }
-        else if (!systemAttribute && !existing)
-        {
-            OnBeforeAttributeAdd(attributeName);
-        }
-
+        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
         Attributes[attributeName] = value;
+        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
 
-        if (systemAttribute && existing)
-        {
-            OnAfterSystemAttributeSet(attributeName);
-        }
-        else if (systemAttribute && !existing)
-        {
-            OnAfterSystemAttributeAdd(attributeName);
-        }
-        else if (!systemAttribute && existing)
-        {
-            OnAfterAttributeSet(attributeName);
-        }
-        else if (!systemAttribute && !existing)
-        {
-            OnAfterAttributeAdd(attributeName);
-        }
         return this;
     }
 
-    public Item Set(string attributeName, decimal value, bool existingOnly = false)
+    public Item Set(string attributeName, decimal value, bool existingOnly = false, bool skipHandlers = false)
     {
         attributeName = ValidateAttributeName(attributeName);
         ValidateAttributeCount(attributeName);
         ValidateSetExisting(attributeName, existingOnly);
 
-        var existing = Attributes.ContainsKey(attributeName);
-        var systemAttribute = SystemAttributes.All.Contains(attributeName);
-
-        if (systemAttribute && existing)
-        {
-            OnBeforeSystemAttributeSet(attributeName);
-        }
-        else if (systemAttribute && !existing)
-        {
-            OnBeforeSystemAttributeAdd(attributeName);
-        }
-        else if (!systemAttribute && existing)
-        {
-            OnBeforeAttributeSet(attributeName);
-        }
-        else if (!systemAttribute && !existing)
-        {
-            OnBeforeAttributeAdd(attributeName);
-        }
-
+        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
         Attributes[attributeName] = value;
+        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
 
-        if (systemAttribute && existing)
-        {
-            OnAfterSystemAttributeSet(attributeName);
-        }
-        else if (systemAttribute && !existing)
-        {
-            OnAfterSystemAttributeAdd(attributeName);
-        }
-        else if (!systemAttribute && existing)
-        {
-            OnAfterAttributeSet(attributeName);
-        }
-        else if (!systemAttribute && !existing)
-        {
-            OnAfterAttributeAdd(attributeName);
-        }
         return this;
     }
 
-    public Item Set(string attributeName, DnValue value, bool existingOnly = false)
+    public Item Set(string attributeName, DnValue value, bool existingOnly = false, bool skipHandlers = false)
     {
         attributeName = ValidateAttributeName(attributeName);
         ValidateAttributeCount(attributeName);
         ValidateSetExisting(attributeName, existingOnly);
 
-        var existing = Attributes.ContainsKey(attributeName);
-        var systemAttribute = SystemAttributes.All.Contains(attributeName);
-
-        if (systemAttribute && existing)
-        {
-            OnBeforeSystemAttributeSet(attributeName);
-        }
-        else if (systemAttribute && !existing)
-        {
-            OnBeforeSystemAttributeAdd(attributeName);
-        }
-        else if (!systemAttribute && existing)
-        {
-            OnBeforeAttributeSet(attributeName);
-        }
-        else if (!systemAttribute && !existing)
-        {
-            OnBeforeAttributeAdd(attributeName);
-        }
-
+        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
         Attributes[attributeName] = value;
+        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
 
-        if (systemAttribute && existing)
-        {
-            OnAfterSystemAttributeSet(attributeName);
-        }
-        else if (systemAttribute && !existing)
-        {
-            OnAfterSystemAttributeAdd(attributeName);
-        }
-        else if (!systemAttribute && existing)
-        {
-            OnAfterAttributeSet(attributeName);
-        }
-        else if (!systemAttribute && !existing)
-        {
-            OnAfterAttributeAdd(attributeName);
-        }
         return this;
     }
 
-    public Item SetAll(Dictionary<string, DnValue> attributes, bool existingOnly = false)
+    public Item SetAll(Dictionary<string, DnValue> attributes, bool existingOnly = false, bool skipHandlers = false )
     {
         foreach (var kvp in attributes)
         {
-            Set(kvp.Key, kvp.Value, existingOnly);
+            Set(kvp.Key, kvp.Value, existingOnly, skipHandlers);
         }
         return this;
     }
 
-    public Item SetAll(Dictionary<string, object> values, bool existingOnly = false)
+    public Item SetAll(Dictionary<string, object> values, bool existingOnly = false, bool skipHandlers = false)
     {
         foreach (var kvp in values)
         {
             if (kvp.Value is string stringValue)
             {
-                Set(kvp.Key, stringValue, existingOnly);
+                Set(kvp.Key, stringValue, existingOnly, skipHandlers);
             }
             else if (kvp.Value is int intValue)
             {
-                Set(kvp.Key, intValue, existingOnly);
+                Set(kvp.Key, intValue, existingOnly, skipHandlers);
             }
             else if (kvp.Value is decimal decimalValue)
             {
-                Set(kvp.Key, decimalValue, existingOnly);
+                Set(kvp.Key, decimalValue, existingOnly, skipHandlers);
             }
             else
             {
@@ -332,147 +195,79 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
     #endregion
 
     #region Add
-    public Item Add(string attributeName, string value)
+    public Item Add(string attributeName, string value, bool skipHandlers = false)
     {
         attributeName = ValidateAttributeName(attributeName);
         value = ValidateStringValue(value);
         ValidateAttributeCount(attributeName);
 
-        var systemAttribute = SystemAttributes.All.Contains(attributeName);
-
-        if (systemAttribute)
-        {
-            OnBeforeSystemAttributeAdd(attributeName);
-        }
-        else
-        {
-            OnBeforeAttributeAdd(attributeName);
-        }
-
+        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
         Attributes.Add(attributeName, value);
+        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
 
-        if (systemAttribute)
-        {
-            OnAfterSystemAttributeAdd(attributeName);
-        }
-        else
-        {
-            OnAfterAttributeAdd(attributeName);
-        }
         return this;
     }
 
-    public Item Add(string attributeName, int value)
+    public Item Add(string attributeName, int value, bool skipHandlers = false)
     {
         attributeName = ValidateAttributeName(attributeName);
         ValidateAttributeCount(attributeName);
 
-        var systemAttribute = SystemAttributes.All.Contains(attributeName);
-
-        if (systemAttribute)
-        {
-            OnBeforeSystemAttributeAdd(attributeName);
-        }
-        else
-        {
-            OnBeforeAttributeAdd(attributeName);
-        }
-
+        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
         Attributes.Add(attributeName, value);
+        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
 
-        if (systemAttribute)
-        {
-            OnAfterSystemAttributeAdd(attributeName);
-        }
-        else
-        {
-            OnAfterAttributeAdd(attributeName);
-        }
         return this;
     }
 
-    public Item Add(string attributeName, decimal value)
+    public Item Add(string attributeName, decimal value, bool skipHandlers = false)
     {
         attributeName = ValidateAttributeName(attributeName);
         ValidateAttributeCount(attributeName);
 
-        var systemAttribute = SystemAttributes.All.Contains(attributeName);
-
-        if (systemAttribute)
-        {
-            OnBeforeSystemAttributeAdd(attributeName);
-        }
-        else
-        {
-            OnBeforeAttributeAdd(attributeName);
-        }
-
+        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
         Attributes.Add(attributeName, value);
+        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
 
-        if (systemAttribute)
-        {
-            OnAfterSystemAttributeAdd(attributeName);
-        }
-        else
-        {
-            OnAfterAttributeAdd(attributeName);
-        }
         return this;
     }
 
-    public Item Add(string attributeName, DnValue value)
+    public Item Add(string attributeName, DnValue value, bool skipHandlers = false)
     {
         attributeName = ValidateAttributeName(attributeName);
         ValidateAttributeCount(attributeName);
 
-        var systemAttribute = SystemAttributes.All.Contains(attributeName);
-
-        if (systemAttribute)
-        {
-            OnBeforeSystemAttributeAdd(attributeName);
-        }
-        else
-        {
-            OnBeforeAttributeAdd(attributeName);
-        }
-
+        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
         Attributes.Add(attributeName, value);
+        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
 
-        if (systemAttribute)
-        {
-            OnAfterSystemAttributeAdd(attributeName);
-        }
-        else
-        {
-            OnAfterAttributeAdd(attributeName);
-        }
         return this;
     }
 
-    public Item AddAll(Dictionary<string, DnValue> attributes)
+    public Item AddAll(Dictionary<string, DnValue> attributes, bool skipHandlers = false)
     {
         foreach (var kvp in attributes)
         {
-            Add(kvp.Key, kvp.Value);
+            Add(kvp.Key, kvp.Value, skipHandlers);
         }
         return this;
     }
 
-    public Item AddAll(Dictionary<string, object> attributes)
+    public Item AddAll(Dictionary<string, object> attributes, bool skipHandlers = false)
     {
         foreach (var kvp in attributes)
         {
             if (kvp.Value is string stringValue)
             {
-                Add(kvp.Key, stringValue);
+                Add(kvp.Key, stringValue, skipHandlers);
             }
             else if (kvp.Value is int intValue)
             {
-                Add(kvp.Key, intValue);
+                Add(kvp.Key, intValue, skipHandlers);
             }
             else if (kvp.Value is decimal decimalValue)
             {
-                Add(kvp.Key, decimalValue);
+                Add(kvp.Key, decimalValue, skipHandlers);
             }
             else
             {
@@ -484,114 +279,93 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
 
     #endregion
 
-    public Item Remove(string attributeName)
+    public Item Remove(string attributeName, bool skipHandlers = false)
     {
         attributeName = ValidateAttributeName(attributeName);
 
-        var systemAttribute = SystemAttributes.All.Contains(attributeName);
-
-        if (systemAttribute)
-        {
-            OnBeforeSystemAttributeRemove(attributeName);
-        }
-        else
-        {
-            OnBeforeAttributeRemove(attributeName);
-        }
-
+        if (!skipHandlers) { OnBeforeAttributeRemove(attributeName); }
         Attributes.Remove(attributeName);
-
-        if (systemAttribute)
-        {
-            OnAfterSystemAttributeRemove(attributeName);
-        }
-        else
-        {
-            OnAfterAttributeRemove(attributeName);
-        }
+        if (!skipHandlers) { OnAfterAttributeRemove(attributeName); }
 
         return this;
     }
-
-    #region System Handlers
-
-    protected virtual void OnBeforeSystemAttributeSet(string attributeName)
-    {
-
-    }
-
-    protected virtual void OnAfterSystemAttributeSet(string attributeName)
-    {
-        switch (attributeName)
-        {
-            case SystemAttributes.Unindexed:
-                Parent?.RemoveIndex(Key);
-                break;
-        }
-    }
-
-    protected virtual void OnBeforeSystemAttributeAdd(string attributeName)
-    {
-
-    }
-
-    protected virtual void OnAfterSystemAttributeAdd(string attributeName)
-    {
-        switch (attributeName)
-        {
-            case SystemAttributes.Unindexed:
-                Parent?.RemoveIndex(Key);
-                break;
-        }
-    }
-
-    protected virtual void OnBeforeSystemAttributeRemove(string attributeName)
-    {
-
-    }
-
-    protected virtual void OnAfterSystemAttributeRemove(string attributeName)
-    {
-        switch (attributeName)
-        {
-            case SystemAttributes.Unindexed:
-                Parent?.SetIndex(Key);
-                break;
-        }
-    }
-
-    #endregion
 
     #region Handlers
 
     protected virtual void OnBeforeAttributeSet(string attributeName)
     {
-
+        if (attributeName.StartsWith(System.SysAttributeNamePrefix))
+        {
+            switch (attributeName)
+            {
+                case SystemAttributes.Indexed:
+                    if (Key.StartsWith(System.SysKeyPrefix))
+                    {
+                        throw new InvalidOperationException($"Attribute '{attributeName}' cannot be set on system keys.");
+                    }
+                break;
+            }
+        }
+        else
+        {
+            switch (attributeName)
+            {
+            }
+        }
     }
 
     protected virtual void OnAfterAttributeSet(string attributeName)
     {
-
-    }
-
-    protected virtual void OnBeforeAttributeAdd(string attributeName)
-    {
-
-    }
-
-    protected virtual void OnAfterAttributeAdd(string attributeName)
-    {
-
+        if (attributeName.StartsWith(System.SysAttributeNamePrefix))
+        {
+            switch (attributeName)
+            {
+                case SystemAttributes.Indexed:
+                    Parent?.SetIndex(Key);
+                    break;
+            }
+        }
+        else
+        {
+            switch (attributeName)
+            {
+            }
+        }
     }
 
     protected virtual void OnBeforeAttributeRemove(string attributeName)
     {
-
+        if (attributeName.StartsWith(System.SysAttributeNamePrefix))
+        {
+            switch (attributeName)
+            {
+            }
+        }
+        else
+        {
+            switch (attributeName)
+            {
+            }
+        }
     }
 
     protected virtual void OnAfterAttributeRemove(string attributeName)
     {
-
+        if (attributeName.StartsWith(System.SysAttributeNamePrefix))
+        {
+            switch (attributeName)
+            {
+                case SystemAttributes.Indexed:
+                Parent?.RemoveIndex(Key);
+                break;
+            }
+        }
+        else
+        {
+            switch (attributeName)
+            {
+            }
+        }
     }
 
     #endregion
