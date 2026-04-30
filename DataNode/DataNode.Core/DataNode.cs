@@ -7,129 +7,78 @@ namespace DataNode.Core;
 public interface IParentDataNode
 {
     int GetIndex(string key);
-    int SetIndex(string key);
-    bool RemoveIndex(string key);
+    Item SetIndex(Item item);
+    Item RemoveIndex(Item item);
 }
 
 public class DataNode : IParentDataNode
 {
-    public DataNode()
-    {
-    }
-
-    public DataNode(Dictionary<string, Item> items) : base()
-    {
-        foreach(var item in items.Values) { Add(item); }
-    }
-
     #region Properties and Fields
     private readonly Dictionary<string, Item> Items = new([]);
     private readonly List<string> Index = new([]);
 
     #endregion
 
+    public DataNode()
+    {
+    }
+    public DataNode(IEnumerable<Item> items) : base()
+    {
+        foreach(var item in items) { Add(item); }
+    }
+    public int Count(bool includeSystemKeys = false)
+    {
+        return includeSystemKeys ? Items.Count : Items.Count(kvp => !kvp.Value.IsSystemItem);
+    }
+    public bool ContainsKey(string key)
+    {
+        return Items.ContainsKey(Item.ValidateKey(key));
+    }
+    public static DataNode Copy(DataNode from)
+    {
+        return new DataNode(from.GetAll());
+    }
+
     #region Validate
-    private void ValidateKeyCount(string key)
+    private string ValidateKeyCount(string key)
     {
         if (Count() >= System.ItemsCountLimit && !ContainsKey(key))
         {
             throw new InvalidOperationException($"Keys count exceeds the limit of {System.ItemsCountLimit}.");
         }
+        return key;
     }
-
-    private void ValidateExisting(string key, bool existingOnly)
+    private string ValidateExisting(string key, bool existingOnly)
     {
         if (existingOnly && !ContainsKey(key))
         {
             throw new KeyNotFoundException($"Key '{key}' not found. Use Add to create new key.");
         }
+        return key;
     }
-
+    private Item ValidateIndexed(Item item)
+    {
+        if (!ContainsKey(item.Key) || !item.Contains(SystemAttributes.Indexed) || item.Parent != this)
+        {
+            throw new InvalidOperationException($"Item '{item.Key}' can't be indexed.");
+        }
+        return item;
+    }
     #endregion
 
-    #region Items
+    #region Get
 
-    public int Count(bool includeSystemKeys = false)
+    public IEnumerable<Item> GetAll()
     {
-        return includeSystemKeys ? Items.Count : Items.Count(kvp => !kvp.Key.StartsWith(System.SysKeyPrefix));
-    }
-
-    public bool ContainsKey(string key)
-    {
-        key = Item.ValidateKey(key);
-        return Items.ContainsKey(key);
-    }
-
-    public Dictionary<string, Item> Get()
-    {
-        var unindexed = Items
-        .Where(kvp => !Index.Contains(kvp.Key))
-        .OrderBy(kvp => kvp.Key);
-
-        var indexed = Items
-        .Where(kvp => Index.Contains(kvp.Key))
-        .OrderBy(kvp => Index.IndexOf(kvp.Key));
-
-        var result = unindexed.Concat(indexed).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        var unindexed = Items.Values.Where(item => !Index.Contains(item.Key)).OrderBy(item => item.Key);
+        var indexed = Items.Values.Where(item => Index.Contains(item.Key)).OrderBy(item => Index.IndexOf(item.Key));
+        var result = unindexed.Concat(indexed).ToArray();
         return result;
-    }
-    
-    public DataNode Set(Item item, bool existingOnly = false, bool skipHandlers = false)
-    {
-        ValidateKeyCount(item.Key);
-        ValidateExisting(item.Key, existingOnly);
-
-        if (item.Parent != null && item.Parent != this)
-        {
-            item = item.Copy(item.Key, this );
-        }
-        else item.Parent ??= this;
-
-        if (!skipHandlers) { OnBeforeItemSet(item); }
-        Items[item.Key] = item;
-        if (!skipHandlers) { OnAfterItemSet(item); }
-
-        return this;
-    }
-
-    public DataNode SetAll(Dictionary<string, Item> items, bool existingOnly = false, bool skipHandlers = false)
-    {
-        foreach (var item in items.Values)
-        {
-            Set(item, existingOnly, skipHandlers);
-        }
-        return this;
-    }
-
-    public DataNode Add(Item item, bool skipHandlers = false)
-    {
-        ValidateKeyCount(item.Key);
-
-        if (item.Parent != null && item.Parent != this)
-        {
-            item = item.Copy(item.Key, this );
-        }
-        else item.Parent ??= this;
-
-        if (!skipHandlers) { OnBeforeItemSet(item); }
-        Items.Add(item.Key, item);
-        if (!skipHandlers) { OnAfterItemSet(item); }
-
-        return this;
-    }
-
-    public DataNode AddAll(Dictionary<string, Item> items, bool skipHandlers = false)
-    {
-        foreach (var item in items.Values)
-        {
-            Add(item, skipHandlers);
-        }
-        return this;
-    }
+    }    
 
     public Item? Get(string key)
     {
-        if (Items.TryGetValue(key, out Item? item))
+        if (Items.TryGetValue(Item.ValidateKey(key), out Item? item))
         {
             return item;
         }
@@ -148,41 +97,97 @@ public class DataNode : IParentDataNode
         }
         else
         {
-            item = new Item(key, this);
-            Add(item);
-            return item;
+            item = new Item([], key, this);
+            return Add(item);
         }
-    }
-
-    public void Remove(string key, bool skipHandlers = false)
-    {
-        ValidateExisting(key, true);
-
-        if (!skipHandlers) { OnBeforeItemRemove(Items[key]); }
-        Items.Remove(key);
-        if (!skipHandlers) { OnAfterItemRemove(Items[key]); }
-
-    }
-
-    public void Clear()
-    {
-        Items.Clear();
-        Index.Clear();
-    }
-
-    public static DataNode Copy(DataNode from)
-    {
-        var itemsCopy = new Dictionary<string, Item>(from.Get());
-        return new DataNode(itemsCopy);
     }
 
     #endregion
 
+    #region Set
+    public Item Set(Item item, bool existingOnly = false, bool skipHandlers = false)
+    {
+        ValidateExisting(ValidateKeyCount(item.Key), existingOnly);
+        item.TakeOwnership(this);
+        if (!skipHandlers) { OnBeforeItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
+        Items[item.Key] = item;
+        if (!skipHandlers) { OnAfterItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
+        return item;
+    }
+    public IEnumerable<Item> SetAll(IEnumerable<Item> items, bool existingOnly = false, bool skipHandlers = false)
+    {
+        var result = new List<Item>();
+        foreach (var item in items)
+        {
+            result.Add(Set(item, existingOnly, skipHandlers));
+        }
+        return result;
+    }
+
+    #endregion
+
+    #region Add
+
+    public Item Add(Item item, bool skipHandlers = false)
+    {
+        ValidateKeyCount(item.Key);
+        item.TakeOwnership(this);
+        if (!skipHandlers) { OnBeforeItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
+        Items.Add(item.Key, item);
+        if (!skipHandlers) { OnAfterItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
+        return item;
+    }
+
+    public IEnumerable<Item> AddAll(IEnumerable<Item> items, bool skipHandlers = false)
+    {
+        var result = new List<Item>();
+        foreach (var item in items)
+        {
+            result.Add(Add(item, skipHandlers));
+        }
+        return result;
+    }
+
+    #endregion
+
+    #region Remove
+
+    public Item Remove(string key, bool skipHandlers = false)
+    {
+        var item = Get(key) ?? throw new InvalidOperationException($"Item '{key}' does not exist.");
+        if (!skipHandlers) { OnBeforeItemRemove(Items.TryGetValue(key, out Item? value) ? value : null); }
+        Items.Remove(item.Key);
+        if (!skipHandlers) { OnAfterItemRemove(null); }
+        return item;
+    }
+    public Item Remove(Item item, bool skipHandlers = false)
+    {
+        return Remove(item.Key, skipHandlers);
+    }
+    public IEnumerable<Item> RemoveAll(IEnumerable<string> keys, bool skipHandlers = false)
+    {
+        var removedItems = new List<Item>();
+        foreach (var key in keys)
+        {
+            removedItems.Add(Remove(key, skipHandlers));
+        }
+        return removedItems;
+    }
+    public IEnumerable<Item> RemoveAll(IEnumerable<Item> items, bool skipHandlers = false)
+    {
+        return RemoveAll(items.Select(item => item.Key), skipHandlers);
+    }
+    public IEnumerable<Item> Clear( bool skipHandlers = false)
+    {
+        return RemoveAll(Items.Keys.ToArray(), skipHandlers);
+    }
+    #endregion
+
     #region Handlers
 
-    protected virtual void OnBeforeItemSet(Item item)
+    protected virtual void OnBeforeItemSet(Item? item)
     {
-        if (item.Key.StartsWith(System.SysKeyPrefix))
+        if (item != null && item.Key.StartsWith(System.SysKeyPrefix))
         {
             if (item.Contains(SystemAttributes.Indexed))
             {
@@ -194,23 +199,23 @@ public class DataNode : IParentDataNode
         }
     }
 
-    protected virtual void OnAfterItemSet(Item item)
+    protected virtual void OnAfterItemSet(Item? item)
     {
-        if (item.Key.StartsWith(System.SysKeyPrefix))
+        if (item != null && item.Key.StartsWith(System.SysKeyPrefix))
         {
         }
         else
         {
-            if (item.Contains(SystemAttributes.Indexed))
+            if (item != null && item.Contains(SystemAttributes.Indexed))
             {
-                SetIndex(item.Key);
+                SetIndex(item);
             }            
         }
     }
 
-    protected virtual void OnBeforeItemRemove(Item item)
+    protected virtual void OnBeforeItemRemove(Item? item)
     {
-        if (item.Key.StartsWith(System.SysKeyPrefix))
+        if (item != null && item.Key.StartsWith(System.SysKeyPrefix))
         {
         }
         else
@@ -218,16 +223,16 @@ public class DataNode : IParentDataNode
         }
     }
 
-    protected virtual void OnAfterItemRemove(Item item)
+    protected virtual void OnAfterItemRemove(Item? item)
     {
-        if (item.Key.StartsWith(System.SysKeyPrefix))
+        if (item != null && item.Key.StartsWith(System.SysKeyPrefix))
         {
         }
         else
         {
-            if (item.Contains(SystemAttributes.Indexed))
+            if (item != null && item.Contains(SystemAttributes.Indexed))
             {
-                RemoveIndex(item.Key);
+                RemoveIndex(item);
             }
         }
     }
@@ -235,6 +240,10 @@ public class DataNode : IParentDataNode
     #endregion
 
     #region Index
+    public int GetIndex(string key)
+    {
+        return Index.IndexOf(key);  
+    }
     private void ResetIndexedAttributes()
     {
         Index.ForEach(key =>
@@ -242,98 +251,51 @@ public class DataNode : IParentDataNode
             var item = Get(key);
             if (item != null)
             {
-                var idx = item.GetInteger(SystemAttributes.Indexed);
-                var currentIdx = Index.IndexOf(key);
-                if (idx != currentIdx)
+                var idxAttribute = item.Get(SystemAttributes.Indexed);
+                if (idxAttribute != null && idxAttribute.GetInteger() != item.IndexPosition)
                 {
-                    item.Set(SystemAttributes.Indexed, currentIdx, true, true);
+                    item.Set(SystemAttributes.Indexed, item.IndexPosition ?? -1, true, true);
                 }
             }
         });
     }
-
-    public int SetIndex(string key)
+    public Item SetIndex(Item item)
     {
-        if (!Index.Contains(key))
+        ValidateIndexed(item);
+        if (!Index.Contains(item.Key))
         {
-            Index.Add(key);
+            Index.Add(item.Key);
         }
         ResetIndexedAttributes();
-        return Index.IndexOf(key);
+        return item;
     }
-
-    public bool RemoveIndex(string key)
+    public Item RemoveIndex(Item item)
     {
-        var result = Index.Remove(key);
+        Index.Remove(item.Key);
         ResetIndexedAttributes();
-        return result;
+        return item;
     }
-
-    private int MoveToIndex(string key, int newIndex)
+    private Item MoveToIndex(Item item, int newIndex)
     {
-        if (!ContainsKey(key))
-        {
-            throw new KeyNotFoundException($"Key '{key}' not found.");
-        }
-        if (newIndex < 0 || newIndex >= Index.Count)
-        {
-            throw new ArgumentOutOfRangeException($"New index '{newIndex}' is out of range.");
-        }
-
-        Index.Remove(key);
-        Index.Insert(newIndex, key);
+        ValidateIndexed(item);
+        Index.Remove(item.Key);
+        Index.Insert(newIndex, item.Key);
         ResetIndexedAttributes();
-        return newIndex;
+        return item;
     }
-
-    public int GetIndex(string key)
+    public Item MoveToEnd(Item item)
     {
-        return Index.IndexOf(key);
+        return MoveToIndex(item, Index.Count - 1);
     }
-
-    public int MoveToEnd(string key)
+    public Item MoveToStart(Item item)
     {
-        key = Item.ValidateKey(key);
-
-        if (!ContainsKey(key))
-        {
-            throw new KeyNotFoundException($"Key '{key}' not found.");
-        }
-
-        Index.Remove(key);
-        Index.Add(key);
-        ResetIndexedAttributes();
-        return Index.Count - 1;
+        return MoveToIndex(item, 0);
     }
-
-    public int MoveToStart(string key)
+    public Item Move(Item item, int offset)
     {
-        key = Item.ValidateKey(key);
-
-        if (!ContainsKey(key))
-        {
-            throw new KeyNotFoundException($"Key '{key}' not found.");
-        }
-
-        Index.Remove(key);
-        Index.Insert(0, key);
-        ResetIndexedAttributes();
-        return 0;
-    }
-
-    public int Move(string key, int offset)
-    {
-        key = Item.ValidateKey(key);
-
-        if (!ContainsKey(key))
-        {
-            throw new KeyNotFoundException($"Key '{key}' not found.");
-        }
-
-        var currentIndex = Index.IndexOf(key);
+        var currentIndex = Index.IndexOf(item.Key);
         var newIndex = Math.Max(0, Math.Min(Index.Count - 1, currentIndex + offset));
-
-        return MoveToIndex(key, newIndex);
+        return MoveToIndex(item, newIndex);
     }
 
     #endregion

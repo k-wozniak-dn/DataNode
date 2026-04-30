@@ -10,23 +10,23 @@ public class UnitTest1
     {
         // Arrange
         var dataNode = new Core.DataNode();
-        var item1 = new Item("item1", dataNode);
+        var item1 = new Item([], "item1", dataNode);
 
         // Act
-        item1.Set("Name", "Apples");
-        item1.Set("Price", 1.5m);
-        item1.Set("Quantity", 10);
+        item1.Add("Name", "Apples");
+        item1.Add("Price", 1.5m);
+        item1.Add("Quantity", 10);
 
         var item2 = item1.Copy("item2", dataNode );
-        item2.Set("Brand", "Sunny");
+        item2.Add("Brand", "Sunny");
         item2.Set("Quantity", 20);
 
         dataNode.Set(item1);
         dataNode.Set(item2);
 
         // Assert
-        var count = dataNode.Get().Sum(kvp => kvp.Value.Count());
-        var total = dataNode.Get().Sum(kvp => kvp.Value.GetDecimal("Price") * kvp.Value.GetInteger("Quantity"));
+        var count = dataNode.GetAll().Sum(item => item.Count());
+        var total = dataNode.GetAll().Sum(item => item.Get("Price")?.GetDecimal() * item.Get("Quantity")?.GetInteger());
         Assert.Equal(7, count); 
         Assert.Equal(45m, total); 
     }
@@ -50,8 +50,8 @@ public class UnitTest1
         item2.Set("Quantity", 20);
 
         // Assert
-        var count = dataNode.Get().Sum(kvp => kvp.Value.Count());
-        var total = dataNode.Get().Sum(kvp => kvp.Value.GetDecimal("Price") * kvp.Value.GetInteger("Quantity"));
+        var count = dataNode.GetAll().Sum(item => item.Count());
+        var total = dataNode.GetAll().Sum(item => item.Get("Price")?.GetDecimal() * item.Get("Quantity")?.GetInteger());
         Assert.Equal(7, count); 
         Assert.Equal(45m, total); 
     }

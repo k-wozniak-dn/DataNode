@@ -1,12 +1,16 @@
 namespace DataNode.Core;
 
-public class Item(Dictionary<string, DnValue> attributes, string key, IParentDataNode? parent = null)
+public interface IItem
 {
+}
+public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode? parent = null) : IItem
+{
+
     #region Properties
-    public Dictionary<string, DnValue> Attributes { get; } = attributes;
+    public Dictionary<string, Attribute> Attributes { get; } = attributes.ToDictionary(attr => attr.Name, attr => attr);
     public string Key { get; } = ValidateKey(key);
     public IParentDataNode? Parent { get; set; } = parent;
-    public int? Index
+    public int? IndexPosition
     {
         get
         {
@@ -16,8 +20,31 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
 
     #endregion
 
-    public Item(string key, IParentDataNode? parent = null) : this([], key, parent)
+    public bool Contains(string attributeName)
     {
+        attributeName = Attribute.ValidateName(attributeName);
+        return Attributes.ContainsKey(attributeName);
+    }
+    public static Item Copy(Item from, string key, IParentDataNode? parent)
+    {
+        return new Item(from.GetAll(), key, parent);
+    }
+    public Item Copy(string? key = null, IParentDataNode? parent = null)
+    {
+        return Copy(this, key ?? Key, parent);
+    }
+    public int Count(bool includeSystemAttributes = false) { 
+        return includeSystemAttributes ? Attributes.Count : Attributes.Count(kvp => !kvp.Value.IsSystemAttribute);
+        }
+    public bool IsSystemItem {
+        get 
+        {
+            return Key.StartsWith(System.SysKeyPrefix);
+        }
+    }
+    public Item TakeOwnership(IParentDataNode parent)
+    {
+        return (Parent != parent) ? Copy(parent: parent) : this;
     }
 
     #region Validate
@@ -30,54 +57,38 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         return key.ToUpper();
     }
     
-    private static string ValidateAttributeName(string attributeName)
-    {
-        if (attributeName.Length > System.AttributeNameLengthLimit)
-        {
-            throw new ArgumentException($"Attribute name length exceeds the limit of {System.AttributeNameLengthLimit} characters.");
-        }
-        return attributeName.ToUpper();
-    }
-
-    private static string ValidateStringValue(string stringValue)
-    {
-        if (stringValue.Length > System.StringValueLengthLimit)
-        {
-            throw new ArgumentException($"String value length exceeds the limit of {System.StringValueLengthLimit} characters.");
-        }
-        return stringValue;
-    }
-
-    private void ValidateAttributeCount(string attributeName)
+    private string ValidateAttributeCount(string attributeName)
     {
         if (Count() >= System.AttributesCountLimit && !Attributes.ContainsKey(attributeName))
         {
             throw new InvalidOperationException($"Attributes count exceeds the limit of {System.AttributesCountLimit}.");
         }
+        return attributeName;
     }
 
-    private void ValidateSetExisting(string attributeName, bool existingOnly)
+    private string ValidateSetExisting(string attributeName, bool existingOnly)
     {
         if (existingOnly && !Contains(attributeName))
         {
             throw new InvalidOperationException($"Attribute '{attributeName}' does not exist. Use Add to add.");
         }
+        return attributeName;
     }
 
     #endregion
 
     #region Get
-    public Dictionary<string, DnValue> Get()
+    public IEnumerable<Attribute> GetAll()
     {
-        return Attributes.OrderBy(kvp => kvp.Key).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-    }    
+        return [.. Attributes.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value)];
+    }
     
-    public DnValue? Get(string attributeName)
+    public Attribute? Get(string attributeName)
     {
-        attributeName = ValidateAttributeName(attributeName);
-        if (Attributes.TryGetValue(attributeName, out DnValue? dnValue))
+        attributeName = Attribute.ValidateName(attributeName);
+        if (Attributes.TryGetValue(attributeName, out Attribute? attribute))
         {
-            return dnValue;
+            return attribute;
         }
         else
         {
@@ -85,305 +96,181 @@ public class Item(Dictionary<string, DnValue> attributes, string key, IParentDat
         }
     }
 
-    public string? GetString(string attributeName)
-    {
-        var value = Get(attributeName);
-        return value is StringValue stringValue ? stringValue.Value : null;
-    }
-
-    public int? GetInteger(string attributeName)
-    {
-        var value = Get(attributeName);
-        return value is IntegerValue integerValue ? integerValue.Value : null;
-    }
-
-    public decimal? GetDecimal(string attributeName)
-    {
-        var value = Get(attributeName);
-        return value is DecimalValue decimalValue ? decimalValue.Value : null;
+    public Attribute GetOrDefault(string attributeName, DnValue defaultValue)
+    {   
+        attributeName = Attribute.ValidateName(attributeName);
+        if (Attributes.TryGetValue(attributeName, out Attribute? attribute))
+        {
+            return attribute;
+        }
+        else
+        {
+            return new Attribute(attributeName, defaultValue);
+        }
     }
 
     #endregion
 
     #region Set
-    public Item Set(string attributeName, string value, bool existingOnly = false, bool skipHandlers = false)
+
+    public Attribute Set(Attribute attribute, bool existingOnly = false, bool skipHandlers = false)
     {
-        attributeName = ValidateAttributeName(attributeName);
-        value = ValidateStringValue(value);
-        ValidateAttributeCount(attributeName);
-        ValidateSetExisting(attributeName, existingOnly);
-
-        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
-        Attributes[attributeName] = value;
-        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
-
-        return this;
+        ValidateSetExisting(ValidateAttributeCount(attribute.Name), existingOnly);
+        attribute.TakeOwnership(this);        
+        if (!skipHandlers) { OnBeforeAttributeSet(attribute); }
+        Attributes[attribute.Name] = attribute;
+        if (!skipHandlers) { OnAfterAttributeSet(attribute); }
+        return attribute;
     }
-
-    public Item Set(string attributeName, int value, bool existingOnly = false, bool skipHandlers = false)
+    public Attribute Set(string attributeName, DnValue value, bool existingOnly = false, bool skipHandlers = false)
     {
-        attributeName = ValidateAttributeName(attributeName);
-        ValidateAttributeCount(attributeName);
-        ValidateSetExisting(attributeName, existingOnly);
-
-        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
-        Attributes[attributeName] = value;
-        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
-
-        return this;
+        var attribute = new Attribute(attributeName, value);
+        return Set(attribute, existingOnly, skipHandlers);
     }
-
-    public Item Set(string attributeName, decimal value, bool existingOnly = false, bool skipHandlers = false)
+    public IEnumerable<Attribute> SetAll(IEnumerable<Attribute> attributes, bool existingOnly = false, bool skipHandlers = false )
     {
-        attributeName = ValidateAttributeName(attributeName);
-        ValidateAttributeCount(attributeName);
-        ValidateSetExisting(attributeName, existingOnly);
-
-        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
-        Attributes[attributeName] = value;
-        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
-
-        return this;
-    }
-
-    public Item Set(string attributeName, DnValue value, bool existingOnly = false, bool skipHandlers = false)
-    {
-        attributeName = ValidateAttributeName(attributeName);
-        ValidateAttributeCount(attributeName);
-        ValidateSetExisting(attributeName, existingOnly);
-
-        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
-        Attributes[attributeName] = value;
-        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
-
-        return this;
-    }
-
-    public Item SetAll(Dictionary<string, DnValue> attributes, bool existingOnly = false, bool skipHandlers = false )
-    {
-        foreach (var kvp in attributes)
+        foreach (var attribute in attributes)
         {
-            Set(kvp.Key, kvp.Value, existingOnly, skipHandlers);
+            Set(attribute, existingOnly, skipHandlers);
         }
-        return this;
-    }
-
-    public Item SetAll(Dictionary<string, object> values, bool existingOnly = false, bool skipHandlers = false)
-    {
-        foreach (var kvp in values)
-        {
-            if (kvp.Value is string stringValue)
-            {
-                Set(kvp.Key, stringValue, existingOnly, skipHandlers);
-            }
-            else if (kvp.Value is int intValue)
-            {
-                Set(kvp.Key, intValue, existingOnly, skipHandlers);
-            }
-            else if (kvp.Value is decimal decimalValue)
-            {
-                Set(kvp.Key, decimalValue, existingOnly, skipHandlers);
-            }
-            else
-            {
-                throw new ArgumentException($"Unsupported value type for key '{kvp.Key}'.");
-            }
-        }
-        return this;
+        return attributes;
     }
 
     #endregion
 
     #region Add
-    public Item Add(string attributeName, string value, bool skipHandlers = false)
+    public Attribute Add(Attribute attribute, bool skipHandlers = false)
     {
-        attributeName = ValidateAttributeName(attributeName);
-        value = ValidateStringValue(value);
-        ValidateAttributeCount(attributeName);
-
-        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
-        Attributes.Add(attributeName, value);
-        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
-
-        return this;
+        ValidateAttributeCount(attribute.Name);
+        attribute.TakeOwnership(this);        
+        if (!skipHandlers) { OnBeforeAttributeSet(attribute); }
+        Attributes.Add(attribute.Name, attribute);
+        if (!skipHandlers) { OnAfterAttributeSet(attribute); }
+        return attribute;
     }
-
-    public Item Add(string attributeName, int value, bool skipHandlers = false)
+    public Attribute Add(string attributeName, DnValue value, bool skipHandlers = false)
     {
-        attributeName = ValidateAttributeName(attributeName);
-        ValidateAttributeCount(attributeName);
-
-        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
-        Attributes.Add(attributeName, value);
-        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
-
-        return this;
+        var attribute = new Attribute(attributeName, value);
+        return Add(attribute, skipHandlers);
     }
-
-    public Item Add(string attributeName, decimal value, bool skipHandlers = false)
+    public IEnumerable<Attribute> AddAll(IEnumerable<Attribute> attributes, bool skipHandlers = false )
     {
-        attributeName = ValidateAttributeName(attributeName);
-        ValidateAttributeCount(attributeName);
-
-        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
-        Attributes.Add(attributeName, value);
-        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
-
-        return this;
-    }
-
-    public Item Add(string attributeName, DnValue value, bool skipHandlers = false)
-    {
-        attributeName = ValidateAttributeName(attributeName);
-        ValidateAttributeCount(attributeName);
-
-        if (!skipHandlers) { OnBeforeAttributeSet(attributeName); }
-        Attributes.Add(attributeName, value);
-        if (!skipHandlers) { OnAfterAttributeSet(attributeName); }
-
-        return this;
-    }
-
-    public Item AddAll(Dictionary<string, DnValue> attributes, bool skipHandlers = false)
-    {
-        foreach (var kvp in attributes)
+        foreach (var attribute in attributes)
         {
-            Add(kvp.Key, kvp.Value, skipHandlers);
+            Add(attribute, skipHandlers);
         }
-        return this;
-    }
-
-    public Item AddAll(Dictionary<string, object> attributes, bool skipHandlers = false)
-    {
-        foreach (var kvp in attributes)
-        {
-            if (kvp.Value is string stringValue)
-            {
-                Add(kvp.Key, stringValue, skipHandlers);
-            }
-            else if (kvp.Value is int intValue)
-            {
-                Add(kvp.Key, intValue, skipHandlers);
-            }
-            else if (kvp.Value is decimal decimalValue)
-            {
-                Add(kvp.Key, decimalValue, skipHandlers);
-            }
-            else
-            {
-                throw new ArgumentException($"Unsupported value type for key '{kvp.Key}'.");
-            }
-        }
-        return this;
+        return attributes;
     }
 
     #endregion
 
-    public Item Remove(string attributeName, bool skipHandlers = false)
+    #region Remove
+    public Attribute Remove(string attributeName, bool skipHandlers = false)
     {
-        attributeName = ValidateAttributeName(attributeName);
-
-        if (!skipHandlers) { OnBeforeAttributeRemove(attributeName); }
-        Attributes.Remove(attributeName);
-        if (!skipHandlers) { OnAfterAttributeRemove(attributeName); }
-
-        return this;
+        var attribute = Get(attributeName) ?? throw new InvalidOperationException($"Attribute '{attributeName}' does not exist.");
+        if (!skipHandlers) { OnBeforeAttributeRemove(attribute); }
+        Attributes.Remove(attribute.Name);
+        if (!skipHandlers) { OnAfterAttributeRemove(attribute); }
+        return attribute;
     }
+    public Attribute Remove(Attribute attribute, bool skipHandlers = false)
+    {
+        return Remove(attribute.Name, skipHandlers);
+    }
+    public IEnumerable<Attribute> RemoveAll(IEnumerable<string> attributeNames, bool skipHandlers = false)
+    {
+        var removedAttributes = new List<Attribute>();
+        foreach (var attributeName in attributeNames)
+        {
+            removedAttributes.Add(Remove(attributeName, skipHandlers));
+        }
+        return removedAttributes;
+    }
+    public IEnumerable<Attribute> RemoveAll(IEnumerable<Attribute> attributes, bool skipHandlers = false)
+    {
+        return RemoveAll(attributes.Select(attr => attr.Name), skipHandlers);
+    }
+
+    #endregion
 
     #region Handlers
 
-    protected virtual void OnBeforeAttributeSet(string attributeName)
+    protected virtual void OnBeforeAttributeSet(Attribute attribute)
     {
-        if (attributeName.StartsWith(System.SysAttributeNamePrefix))
+        if (attribute.IsSystemAttribute)
         {
-            switch (attributeName)
+            switch (attribute.Name)
             {
                 case SystemAttributes.Indexed:
-                    if (Key.StartsWith(System.SysKeyPrefix))
+                    if (IsSystemItem)
                     {
-                        throw new InvalidOperationException($"Attribute '{attributeName}' cannot be set on system keys.");
+                        throw new InvalidOperationException($"Attribute '{attribute.Name}' cannot be set in system item.");
                     }
                 break;
             }
         }
         else
         {
-            switch (attributeName)
-            {
-            }
+            // switch (attribute.Name)
+            // {
+            // }
         }
     }
 
-    protected virtual void OnAfterAttributeSet(string attributeName)
+    protected virtual void OnAfterAttributeSet(Attribute attribute)
     {
-        if (attributeName.StartsWith(System.SysAttributeNamePrefix))
+        if (attribute.IsSystemAttribute)
         {
-            switch (attributeName)
+            switch (attribute.Name)
             {
                 case SystemAttributes.Indexed:
-                    Parent?.SetIndex(Key);
+                    Parent?.SetIndex(this);
                     break;
             }
         }
         else
         {
-            switch (attributeName)
-            {
-            }
+            // switch (attribute.Name)
+            // {
+            // }
         }
     }
 
-    protected virtual void OnBeforeAttributeRemove(string attributeName)
+    protected virtual void OnBeforeAttributeRemove(Attribute attribute)
     {
-        if (attributeName.StartsWith(System.SysAttributeNamePrefix))
+        if (attribute.IsSystemAttribute)
         {
-            switch (attributeName)
-            {
-            }
+            // switch (attribute.Name)
+            // {
+            // }
         }
         else
         {
-            switch (attributeName)
-            {
-            }
+            // switch (attribute.Name)
+            // {
+            // }
         }
     }
 
-    protected virtual void OnAfterAttributeRemove(string attributeName)
+    protected virtual void OnAfterAttributeRemove(Attribute attribute)
     {
-        if (attributeName.StartsWith(System.SysAttributeNamePrefix))
+        if (attribute.IsSystemAttribute)
         {
-            switch (attributeName)
+            switch (attribute.Name)
             {
                 case SystemAttributes.Indexed:
-                Parent?.RemoveIndex(Key);
+                Parent?.RemoveIndex(this);
                 break;
             }
         }
         else
         {
-            switch (attributeName)
-            {
-            }
+            // switch (attribute.Name)
+            // {
+            // }
         }
     }
 
     #endregion
 
-    public bool Contains(string attributeName)
-    {
-        attributeName = ValidateAttributeName(attributeName);
-        return Attributes.ContainsKey(attributeName);
-    }
-
-    public Item Copy(string key, IParentDataNode? parent)
-    {
-        return new Item(new Dictionary<string, DnValue>(Attributes), key, parent);
-    }
-
-    public int Count(bool includeSystemAttributes = false) { 
-        return includeSystemAttributes ? 
-            Attributes.Count : 
-            Attributes.Count(kvp => !kvp.Key.StartsWith(System.SysAttributeNamePrefix));
-        }
 }
