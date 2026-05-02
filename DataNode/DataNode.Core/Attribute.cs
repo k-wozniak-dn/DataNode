@@ -15,10 +15,6 @@ public record Attribute(string Name, DnValue Value, IItem? Parent = null)
             return Name.StartsWith(System.SysAttributeNamePrefix);
         }
     }
-    public Attribute TakeOwnership(IItem parent)
-    {
-        return (Parent != parent) ? Copy(parent: parent) : this;
-    }
 
     #endregion
 

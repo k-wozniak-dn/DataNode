@@ -4,13 +4,14 @@ namespace DataNode.Core;
 
 public interface IItem
 {
+    string Key { get; }
 }
-public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode? parent = null) : IItem
+public class Item : IItem
 {
     #region Properties
-    public Dictionary<string, Attribute> Attributes { get; } = attributes.ToDictionary(attr => attr.Name, attr => attr);
-    public string Key { get; } = Validator.ValidateKey(key);
-    public IParentDataNode? Parent { get; set; } = parent;
+    public Dictionary<string, Attribute> Attributes { get; } = [];
+    public string Key { get; }
+    public IParentDataNode? Parent { get; set; }
     public int? IndexPosition
     {
         get
@@ -23,10 +24,6 @@ public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode
         {
             return Key.StartsWith(System.SysKeyPrefix);
         }
-    }
-    public Item TakeOwnership(IParentDataNode parent)
-    {
-        return (Parent != parent) ? Copy(parent: parent) : this;
     }
     public int Count(bool includeSystemAttributes = false) { 
         return includeSystemAttributes ? Attributes.Count : Attributes.Count(kvp => !kvp.Value.IsSystemAttribute);
@@ -55,6 +52,16 @@ public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode
             throw new InvalidOperationException($"Attribute '{attributeName}' does not exist. Use Add to add.");
         }
         return attributeName;
+    }
+
+    #endregion
+
+    #region Constructors
+    public Item(IEnumerable<Attribute> attributes, string key, IParentDataNode? parent = null)
+    {
+        Key = Validator.ValidateKey(key);
+        Parent = parent;
+        AddAll(attributes);
     }
 
     #endregion
@@ -120,10 +127,25 @@ public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode
 
     #region Set
 
+    public Attribute TakeOwnership(Attribute attribute)
+    {
+        if (attribute.Parent != this)
+        {
+            if (attribute.Parent == null)
+            {
+                attribute.Parent = this;
+            }
+            else
+            {
+                attribute = attribute.Copy(parent: this);                
+            }
+        }
+        return attribute;
+    }
     public Attribute Set(Attribute attribute, bool existingOnly = false, bool skipHandlers = false)
     {
         ValidateSetExisting(ValidateAttributeCount(attribute.Name), existingOnly);
-        attribute.TakeOwnership(this);        
+        TakeOwnership(attribute);        
         if (!skipHandlers) { OnBeforeAttributeSet(attribute); }
         Attributes[attribute.Name] = attribute;
         if (!skipHandlers) { OnAfterAttributeSet(attribute); }
@@ -149,7 +171,7 @@ public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode
     public Attribute Add(Attribute attribute, bool skipHandlers = false)
     {
         ValidateAttributeCount(attribute.Name);
-        attribute.TakeOwnership(this);        
+        TakeOwnership(attribute);        
         if (!skipHandlers) { OnBeforeAttributeSet(attribute); }
         Attributes.Add(attribute.Name, attribute);
         if (!skipHandlers) { OnAfterAttributeSet(attribute); }

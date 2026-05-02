@@ -113,10 +113,25 @@ public class DataNode : IParentDataNode
     #endregion
 
     #region Set
+    public Item TakeOwnership(Item item)
+    {
+        if (item.Parent != this)
+        {
+            if (item.Parent == null)
+            {
+                item.Parent = this;
+            }
+            else
+            {
+                item = item.Copy(parent: this);                
+            }
+        }
+        return item;
+    }
     public Item Set(Item item, bool existingOnly = false, bool skipHandlers = false)
     {
         ValidateExisting(ValidateKeyCount(item.Key), existingOnly);
-        item.TakeOwnership(this);
+        TakeOwnership(item);
         if (!skipHandlers) { OnBeforeItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
         Items[item.Key] = item;
         if (!skipHandlers) { OnAfterItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
@@ -139,13 +154,12 @@ public class DataNode : IParentDataNode
     public Item Add(Item item, bool skipHandlers = false)
     {
         ValidateKeyCount(item.Key);
-        item.TakeOwnership(this);
+        TakeOwnership(item);
         if (!skipHandlers) { OnBeforeItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
         Items.Add(item.Key, item);
         if (!skipHandlers) { OnAfterItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
         return item;
     }
-
     public IEnumerable<Item> AddAll(IEnumerable<Item> items, bool skipHandlers = false)
     {
         var result = new List<Item>();
@@ -155,7 +169,6 @@ public class DataNode : IParentDataNode
         }
         return result;
     }
-
     public Item GetOrCreate(string key)
     {
         var item = Get(key);
