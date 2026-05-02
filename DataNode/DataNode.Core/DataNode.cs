@@ -13,33 +13,22 @@ public interface IParentDataNode
 
 public class DataNode : IParentDataNode
 {
+
     #region Properties and Fields
     private readonly Dictionary<string, Item> Items = new([]);
     private readonly List<string> Index = new([]);
-
-    #endregion
-
-    public DataNode()
-    {
-    }
-    public DataNode(IEnumerable<Item> items) : base()
-    {
-        foreach(var item in items) { Add(item); }
-    }
     public int Count(bool includeSystemKeys = false)
     {
         return includeSystemKeys ? Items.Count : Items.Count(kvp => !kvp.Value.IsSystemItem);
     }
-    public bool ContainsKey(string key)
-    {
-        return Items.ContainsKey(Item.ValidateKey(key));
-    }
-    public static DataNode Copy(DataNode from)
-    {
-        return new DataNode(from.GetAll());
-    }
+
+    #endregion
 
     #region Validate
+    public bool ContainsKey(string key)
+    {
+        return Items.ContainsKey(Validator.ValidateKey(key));
+    }
     private string ValidateKeyCount(string key)
     {
         if (Count() >= System.ItemsCountLimit && !ContainsKey(key))
@@ -64,10 +53,43 @@ public class DataNode : IParentDataNode
         }
         return item;
     }
+    
+    #endregion
+
+    #region Constructors
+    public DataNode()
+
+    {
+    }
+    public DataNode(IEnumerable<Item> items) : base()
+    {
+        foreach(var item in items) { Add(item); }
+    }
+
+    #endregion
+
+    #region Convertion
+    public Dictionary<string, Dictionary<string, object>> ToDictionary()
+    {
+        return GetAll().ToDictionary(item => item.Key, item => item.ToDictionary());
+    }
+    public static DataNode FromDictionary(Dictionary<string, Dictionary<string, object>> dict)
+    {
+        var items = dict.Select(kvp => Item.FromDictionary(kvp.Key, kvp.Value));
+        return new DataNode(items);
+    }
+
+    #endregion
+
+    #region Copy
+    public static DataNode Copy(DataNode from)
+    {
+        return new DataNode(from.GetAll());
+    }
+
     #endregion
 
     #region Get
-
     public IEnumerable<Item> GetAll()
     {
         var unindexed = Items.Values.Where(item => !Index.Contains(item.Key)).OrderBy(item => item.Key);
@@ -78,27 +100,13 @@ public class DataNode : IParentDataNode
 
     public Item? Get(string key)
     {
-        if (Items.TryGetValue(Item.ValidateKey(key), out Item? item))
+        if (Items.TryGetValue(Validator.ValidateKey(key), out Item? item))
         {
             return item;
         }
         else
         {
             return null;
-        }
-    }
-
-    public Item GetOrCreate(string key)
-    {
-        var item = Get(key);
-        if (item != null)
-        {
-            return item;
-        }
-        else
-        {
-            item = new Item([], key, this);
-            return Add(item);
         }
     }
 
@@ -146,6 +154,20 @@ public class DataNode : IParentDataNode
             result.Add(Add(item, skipHandlers));
         }
         return result;
+    }
+
+    public Item GetOrCreate(string key)
+    {
+        var item = Get(key);
+        if (item != null)
+        {
+            return item;
+        }
+        else
+        {
+            item = new Item([], key, this);
+            return Add(item);
+        }
     }
 
     #endregion
@@ -300,8 +322,6 @@ public class DataNode : IParentDataNode
 
     #endregion
 
-    #region Export and Import
-
     // public IEnumerable<KeyValuePair<string, Item>> ExportKeys()
     // {
     //     SetIndexAttributes();
@@ -431,5 +451,4 @@ public class DataNode : IParentDataNode
     //     return this;
     // }
 
-    #endregion
 }

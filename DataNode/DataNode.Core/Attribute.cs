@@ -1,22 +1,13 @@
+using System.Linq.Expressions;
+
 namespace DataNode.Core;
 
 public record Attribute(string Name, DnValue Value, IItem? Parent = null)
 {
-    public string Name { get; } = ValidateName(Name);
-    public DnValue Value { get; } = ValidateValue(Value);
+    #region Properties
+    public string Name { get; } = Validator.ValidateName(Name);
+    public DnValue Value { get; } = Validator.ValidateValue(Value);
     public IItem? Parent { get; set; } = Parent;
-    public static Attribute Copy(Attribute attribute, string? name = null, DnValue? value = null, IItem? parent = null)
-    {
-        return new Attribute(name ?? attribute.Name, value ?? attribute.Value, parent ?? attribute.Parent);
-    }
-    public Attribute Copy(string? name = null, DnValue? value = null, IItem? parent = null)
-    {
-        return Copy(this, name, value, parent);
-    }
-    public Attribute TakeOwnership(IItem parent)
-    {
-        return (Parent != parent) ? Copy(parent: parent) : this;
-    }
     public bool IsSystemAttribute
     {
         get
@@ -24,37 +15,52 @@ public record Attribute(string Name, DnValue Value, IItem? Parent = null)
             return Name.StartsWith(System.SysAttributeNamePrefix);
         }
     }
-    
-    #region Validate
-    public static string ValidateName(string name)
+    public Attribute TakeOwnership(IItem parent)
     {
-        name = name.Trim().ToUpper();
-        if (name.Length > System.AttributeNameLengthLimit)
-        {
-            throw new ArgumentException($"Attribute name length exceeds the limit of {System.AttributeNameLengthLimit} characters.");
-        }
-        return name;
+        return (Parent != parent) ? Copy(parent: parent) : this;
     }
-    public static string ValidateStringValue(string stringValue)
-    {
-        if (stringValue.Length > System.StringValueLengthLimit)
-        {
-            throw new ArgumentException($"String value length exceeds the limit of {System.StringValueLengthLimit} characters.");
-        }
-        return stringValue;
-    }
-    public static DnValue ValidateValue(DnValue value)
+
+    #endregion
+
+    #region Convertion
+    public static object ToObjectValue(DnValue value)
     {
         if (value is StringValue stringValue)
         {
-            ValidateStringValue(stringValue.Value);
+            return stringValue.Value;
         }
-        return value;
+        else if (value is IntegerValue integerValue)
+        {
+            return integerValue.Value;
+        }
+        else if (value is DecimalValue decimalValue)
+        {
+            return decimalValue.Value;
+        }
+        else
+        {
+            throw new InvalidOperationException($"Unsupported value type.");
+        }
     }
-    
-    #endregion
-
-    #region GetValue
+    public static DnValue FromObjectValue(object objectValue)
+    {
+        if (objectValue is string)
+        {
+            return (StringValue)objectValue;
+        }
+        else if (objectValue is int)
+        {
+            return (IntegerValue)objectValue;
+        }
+        else if (objectValue is decimal)
+        {
+            return (DecimalValue)objectValue;
+        }
+        else
+        {
+            throw new InvalidOperationException($"Unsupported value type.");
+        }
+    }
     public string GetString()
     {
         return Value is StringValue stringValue ? stringValue.Value : 
@@ -72,4 +78,17 @@ public record Attribute(string Name, DnValue Value, IItem? Parent = null)
     }
     
     #endregion
+
+    #region Copy
+    public static Attribute Copy(Attribute attribute, string? name = null, DnValue? value = null, IItem? parent = null)
+    {
+        return new Attribute(name ?? attribute.Name, value ?? attribute.Value, parent ?? attribute.Parent);
+    }
+    public Attribute Copy(string? name = null, DnValue? value = null, IItem? parent = null)
+    {
+        return Copy(this, name, value, parent);
+    }
+    
+    #endregion
+
 }

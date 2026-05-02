@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace DataNode.Core;
 
 public interface IItem
@@ -5,10 +7,9 @@ public interface IItem
 }
 public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode? parent = null) : IItem
 {
-
     #region Properties
     public Dictionary<string, Attribute> Attributes { get; } = attributes.ToDictionary(attr => attr.Name, attr => attr);
-    public string Key { get; } = ValidateKey(key);
+    public string Key { get; } = Validator.ValidateKey(key);
     public IParentDataNode? Parent { get; set; } = parent;
     public int? IndexPosition
     {
@@ -17,25 +18,6 @@ public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode
             return Parent?.GetIndex(Key);
         }
     }
-
-    #endregion
-
-    public bool Contains(string attributeName)
-    {
-        attributeName = Attribute.ValidateName(attributeName);
-        return Attributes.ContainsKey(attributeName);
-    }
-    public static Item Copy(Item from, string key, IParentDataNode? parent)
-    {
-        return new Item(from.GetAll(), key, parent);
-    }
-    public Item Copy(string? key = null, IParentDataNode? parent = null)
-    {
-        return Copy(this, key ?? Key, parent);
-    }
-    public int Count(bool includeSystemAttributes = false) { 
-        return includeSystemAttributes ? Attributes.Count : Attributes.Count(kvp => !kvp.Value.IsSystemAttribute);
-        }
     public bool IsSystemItem {
         get 
         {
@@ -46,17 +28,18 @@ public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode
     {
         return (Parent != parent) ? Copy(parent: parent) : this;
     }
+    public int Count(bool includeSystemAttributes = false) { 
+        return includeSystemAttributes ? Attributes.Count : Attributes.Count(kvp => !kvp.Value.IsSystemAttribute);
+        }
+
+    #endregion
 
     #region Validate
-    public static string ValidateKey(string key)
+    public bool Contains(string attributeName)
     {
-        if (key.Length > System.KeyLengthLimit)
-        {
-            throw new ArgumentException($"Key length exceeds the limit of {System.KeyLengthLimit} characters.");
-        }
-        return key.ToUpper();
+        attributeName = Validator.ValidateName(attributeName);
+        return Attributes.ContainsKey(attributeName);
     }
-    
     private string ValidateAttributeCount(string attributeName)
     {
         if (Count() >= System.AttributesCountLimit && !Attributes.ContainsKey(attributeName))
@@ -65,7 +48,6 @@ public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode
         }
         return attributeName;
     }
-
     private string ValidateSetExisting(string attributeName, bool existingOnly)
     {
         if (existingOnly && !Contains(attributeName))
@@ -73,6 +55,31 @@ public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode
             throw new InvalidOperationException($"Attribute '{attributeName}' does not exist. Use Add to add.");
         }
         return attributeName;
+    }
+
+    #endregion
+
+    #region Convertion
+    public Dictionary<string, object> ToDictionary()
+    {
+        return GetAll().ToDictionary(attr => attr.Name, attr => Attribute.ToObjectValue(attr.Value));
+    }
+    public static Item FromDictionary(string key, Dictionary<string, object> dict)
+    {
+        var attributes = dict.Select(kvp => new Attribute(kvp.Key, Attribute.FromObjectValue(kvp.Value)));
+        return new Item(attributes, key);
+    }
+
+    #endregion
+
+    #region Copy
+    public static Item Copy(Item from, string key, IParentDataNode? parent)
+    {
+        return new Item(from.GetAll(), key, parent);
+    }
+    public Item Copy(string? key = null, IParentDataNode? parent = null)
+    {
+        return Copy(this, key ?? Key, parent);
     }
 
     #endregion
@@ -85,7 +92,7 @@ public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode
     
     public Attribute? Get(string attributeName)
     {
-        attributeName = Attribute.ValidateName(attributeName);
+        attributeName = Validator.ValidateName(attributeName);
         if (Attributes.TryGetValue(attributeName, out Attribute? attribute))
         {
             return attribute;
@@ -98,7 +105,7 @@ public class Item(IEnumerable<Attribute> attributes, string key, IParentDataNode
 
     public Attribute GetOrDefault(string attributeName, DnValue defaultValue)
     {   
-        attributeName = Attribute.ValidateName(attributeName);
+        attributeName = Validator.ValidateName(attributeName);
         if (Attributes.TryGetValue(attributeName, out Attribute? attribute))
         {
             return attribute;
