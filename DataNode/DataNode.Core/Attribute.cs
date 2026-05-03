@@ -19,44 +19,6 @@ public record Attribute(string Name, DnValue Value, IItem? Parent = null)
     #endregion
 
     #region Convertion
-    public static object ToObjectValue(DnValue value)
-    {
-        if (value is StringValue stringValue)
-        {
-            return stringValue.Value;
-        }
-        else if (value is IntegerValue integerValue)
-        {
-            return integerValue.Value;
-        }
-        else if (value is DecimalValue decimalValue)
-        {
-            return decimalValue.Value;
-        }
-        else
-        {
-            throw new InvalidOperationException($"Unsupported value type.");
-        }
-    }
-    public static DnValue FromObjectValue(object objectValue)
-    {
-        if (objectValue is string)
-        {
-            return (StringValue)objectValue;
-        }
-        else if (objectValue is int)
-        {
-            return (IntegerValue)objectValue;
-        }
-        else if (objectValue is decimal)
-        {
-            return (DecimalValue)objectValue;
-        }
-        else
-        {
-            throw new InvalidOperationException($"Unsupported value type.");
-        }
-    }
     public string GetString()
     {
         return Value is StringValue stringValue ? stringValue.Value : 

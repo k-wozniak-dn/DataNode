@@ -69,11 +69,11 @@ public class Item : IItem
     #region Convertion
     public Dictionary<string, object> ToDictionary()
     {
-        return GetAll().ToDictionary(attr => attr.Name, attr => Attribute.ToObjectValue(attr.Value));
+        return GetAll().ToDictionary(attr => attr.Name, attr => DnValue.ToObjectValue(attr.Value));
     }
     public static Item FromDictionary(string key, Dictionary<string, object> dict)
     {
-        var attributes = dict.Select(kvp => new Attribute(kvp.Key, Attribute.FromObjectValue(kvp.Value)));
+        var attributes = dict.Select(kvp => new Attribute(kvp.Key, DnValue.FromObjectValue(kvp.Value)));
         return new Item(attributes, key);
     }
 
@@ -96,7 +96,6 @@ public class Item : IItem
     {
         return [.. Attributes.OrderBy(kvp => kvp.Key).Select(kvp => kvp.Value)];
     }
-    
     public Attribute? Get(string attributeName)
     {
         attributeName = Validator.ValidateName(attributeName);
@@ -109,9 +108,8 @@ public class Item : IItem
             return null;
         }
     }
-
-    public Attribute GetOrDefault(string attributeName, DnValue defaultValue)
-    {   
+    public Attribute GetOrDefault(string attributeName, object defaultValue)
+    {
         attributeName = Validator.ValidateName(attributeName);
         if (Attributes.TryGetValue(attributeName, out Attribute? attribute))
         {
@@ -119,7 +117,7 @@ public class Item : IItem
         }
         else
         {
-            return new Attribute(attributeName, defaultValue);
+            return new Attribute(attributeName, DnValue.FromObjectValue(defaultValue));
         }
     }
 
@@ -151,9 +149,9 @@ public class Item : IItem
         if (!skipHandlers) { OnAfterAttributeSet(attribute); }
         return attribute;
     }
-    public Attribute Set(string attributeName, DnValue value, bool existingOnly = false, bool skipHandlers = false)
+    public Attribute Set(string attributeName, object value, bool existingOnly = false, bool skipHandlers = false)
     {
-        var attribute = new Attribute(attributeName, value);
+        var attribute = new Attribute(attributeName, DnValue.FromObjectValue(value));
         return Set(attribute, existingOnly, skipHandlers);
     }
     public IEnumerable<Attribute> SetAll(IEnumerable<Attribute> attributes, bool existingOnly = false, bool skipHandlers = false )
@@ -177,9 +175,9 @@ public class Item : IItem
         if (!skipHandlers) { OnAfterAttributeSet(attribute); }
         return attribute;
     }
-    public Attribute Add(string attributeName, DnValue value, bool skipHandlers = false)
+    public Attribute Add(string attributeName, object value, bool skipHandlers = false)
     {
-        var attribute = new Attribute(attributeName, value);
+        var attribute = new Attribute(attributeName, DnValue.FromObjectValue(value));
         return Add(attribute, skipHandlers);
     }
     public IEnumerable<Attribute> AddAll(IEnumerable<Attribute> attributes, bool skipHandlers = false )
