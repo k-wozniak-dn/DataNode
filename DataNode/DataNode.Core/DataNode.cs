@@ -63,7 +63,7 @@ public class DataNode : IParentDataNode
     }
     public DataNode(IEnumerable<Item> items) : base()
     {
-        foreach(var item in items) { Add(item); }
+        AddAll(items);
     }
 
     #endregion
@@ -86,7 +86,10 @@ public class DataNode : IParentDataNode
     {
         return new DataNode(from.GetAll());
     }
-
+    public DataNode Copy()
+    {
+        return Copy(this);
+    }
     #endregion
 
     #region Get
@@ -115,26 +118,15 @@ public class DataNode : IParentDataNode
     #region Set
     public Item TakeOwnership(Item item)
     {
-        if (item.Parent != this)
-        {
-            if (item.Parent == null)
-            {
-                item.Parent = this;
-            }
-            else
-            {
-                item = item.Copy(parent: this);                
-            }
-        }
-        return item;
+        return (item.Parent != this) ? item.Copy(parent: this) : item;
     }
     public Item Set(Item item, bool existingOnly = false, bool skipHandlers = false)
     {
         ValidateExisting(ValidateKeyCount(item.Key), existingOnly);
-        TakeOwnership(item);
-        if (!skipHandlers) { OnBeforeItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
+        item = TakeOwnership(item);
+        if (!skipHandlers) { OnBeforeItemSet(item); }
         Items[item.Key] = item;
-        if (!skipHandlers) { OnAfterItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
+        if (!skipHandlers) { OnAfterItemSet(item); }
         return item;
     }
     public IEnumerable<Item> SetAll(IEnumerable<Item> items, bool existingOnly = false, bool skipHandlers = false)
@@ -154,10 +146,10 @@ public class DataNode : IParentDataNode
     public Item Add(Item item, bool skipHandlers = false)
     {
         ValidateKeyCount(item.Key);
-        TakeOwnership(item);
-        if (!skipHandlers) { OnBeforeItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
+        item = TakeOwnership(item);
+        if (!skipHandlers) { OnBeforeItemSet(item); }
         Items.Add(item.Key, item);
-        if (!skipHandlers) { OnAfterItemSet(Items.TryGetValue(item.Key, out Item? value) ? value : null); }
+        if (!skipHandlers) { OnAfterItemSet(item); }
         return item;
     }
     public IEnumerable<Item> AddAll(IEnumerable<Item> items, bool skipHandlers = false)
@@ -190,9 +182,9 @@ public class DataNode : IParentDataNode
     public Item Remove(string key, bool skipHandlers = false)
     {
         var item = Get(key) ?? throw new InvalidOperationException($"Item '{key}' does not exist.");
-        if (!skipHandlers) { OnBeforeItemRemove(Items.TryGetValue(key, out Item? value) ? value : null); }
+        if (!skipHandlers) { OnBeforeItemRemove(item); }
         Items.Remove(item.Key);
-        if (!skipHandlers) { OnAfterItemRemove(null); }
+        if (!skipHandlers) { OnAfterItemRemove(item); }
         return item;
     }
     public Item Remove(Item item, bool skipHandlers = false)
@@ -222,7 +214,7 @@ public class DataNode : IParentDataNode
 
     protected virtual void OnBeforeItemSet(Item? item)
     {
-        if (item != null && item.Key.StartsWith(System.SysKeyPrefix))
+        if (item != null && item.IsSystemItem)
         {
             if (item.Contains(SystemAttributes.Indexed))
             {
@@ -236,7 +228,7 @@ public class DataNode : IParentDataNode
 
     protected virtual void OnAfterItemSet(Item? item)
     {
-        if (item != null && item.Key.StartsWith(System.SysKeyPrefix))
+        if (item != null && item.IsSystemItem)
         {
         }
         else
@@ -250,7 +242,7 @@ public class DataNode : IParentDataNode
 
     protected virtual void OnBeforeItemRemove(Item? item)
     {
-        if (item != null && item.Key.StartsWith(System.SysKeyPrefix))
+        if (item != null && item.IsSystemItem)
         {
         }
         else
@@ -260,7 +252,7 @@ public class DataNode : IParentDataNode
 
     protected virtual void OnAfterItemRemove(Item? item)
     {
-        if (item != null && item.Key.StartsWith(System.SysKeyPrefix))
+        if (item != null && item.IsSystemItem)
         {
         }
         else

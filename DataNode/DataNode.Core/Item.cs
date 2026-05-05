@@ -11,7 +11,7 @@ public class Item : IItem
     #region Properties
     public Dictionary<string, Attribute> Attributes { get; } = [];
     public string Key { get; }
-    public IParentDataNode? Parent { get; set; }
+    public IParentDataNode? Parent { get; }
     public int? IndexPosition
     {
         get
@@ -61,7 +61,7 @@ public class Item : IItem
     {
         Key = Validator.ValidateKey(key);
         Parent = parent;
-        AddAll(attributes);
+        AddAll(attributes, true);
     }
 
     #endregion
@@ -127,23 +127,12 @@ public class Item : IItem
 
     public Attribute TakeOwnership(Attribute attribute)
     {
-        if (attribute.Parent != this)
-        {
-            if (attribute.Parent == null)
-            {
-                attribute.Parent = this;
-            }
-            else
-            {
-                attribute = attribute.Copy(parent: this);                
-            }
-        }
-        return attribute;
+        return (attribute.Parent != this) ? attribute.Copy(parent: this) : attribute;
     }
     public Attribute Set(Attribute attribute, bool existingOnly = false, bool skipHandlers = false)
     {
         ValidateSetExisting(ValidateAttributeCount(attribute.Name), existingOnly);
-        TakeOwnership(attribute);        
+        attribute = TakeOwnership(attribute);
         if (!skipHandlers) { OnBeforeAttributeSet(attribute); }
         Attributes[attribute.Name] = attribute;
         if (!skipHandlers) { OnAfterAttributeSet(attribute); }
@@ -169,7 +158,7 @@ public class Item : IItem
     public Attribute Add(Attribute attribute, bool skipHandlers = false)
     {
         ValidateAttributeCount(attribute.Name);
-        TakeOwnership(attribute);        
+        attribute = TakeOwnership(attribute);        
         if (!skipHandlers) { OnBeforeAttributeSet(attribute); }
         Attributes.Add(attribute.Name, attribute);
         if (!skipHandlers) { OnAfterAttributeSet(attribute); }

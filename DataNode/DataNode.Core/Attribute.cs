@@ -7,7 +7,7 @@ public record Attribute(string Name, DnValue Value, IItem? Parent = null)
     #region Properties
     public string Name { get; } = Validator.ValidateName(Name);
     public DnValue Value { get; } = Validator.ValidateValue(Value);
-    public IItem? Parent { get; set; } = Parent;
+    public IItem? Parent { get; } = Parent;
     public bool IsSystemAttribute
     {
         get
