@@ -9,8 +9,13 @@ public interface IItem
 public class Item : IItem
 {
     #region Properties
-    public Dictionary<string, Attribute> Attributes { get; } = [];
-    public string Key { get; }
+    private Dictionary<string, Attribute> Attributes { get; } = new([]);
+    public string Key { 
+        get 
+        {
+            return Get(SystemAttributes.Key)?.GetString() ?? throw new KeyNotFoundException("Key not found.");
+        } 
+    }
     public IParentDataNode? Parent { get; }
     public int? IndexPosition
     {
@@ -32,9 +37,17 @@ public class Item : IItem
     #endregion
 
     #region Validate
+    public static string ValidateKey(string key)
+    {
+        if (key.Length > System.KeyLengthLimit)
+        {
+            throw new ArgumentException($"Key length exceeds the limit of {System.KeyLengthLimit} characters.");
+        }
+        return key.ToUpper();
+    }
     public bool Contains(string attributeName)
     {
-        attributeName = Validator.ValidateName(attributeName);
+        attributeName = Attribute.ValidateName(attributeName);
         return Attributes.ContainsKey(attributeName);
     }
     private string ValidateAttributeCount(string attributeName)
@@ -57,11 +70,14 @@ public class Item : IItem
     #endregion
 
     #region Constructors
-    public Item(IEnumerable<Attribute> attributes, string key, IParentDataNode? parent = null)
+    public Item(IEnumerable<Attribute> attributes, string? key, IParentDataNode? parent = null)
     {
-        Key = Validator.ValidateKey(key);
-        Parent = parent;
         AddAll(attributes, true);
+        if (key != null)
+        {
+            Set(SystemAttributes.Key, ValidateKey(key), false, true); 
+        }
+        Parent = parent;
     }
 
     #endregion
@@ -98,7 +114,7 @@ public class Item : IItem
     }
     public Attribute? Get(string attributeName)
     {
-        attributeName = Validator.ValidateName(attributeName);
+        attributeName = Attribute.ValidateName(attributeName);
         if (Attributes.TryGetValue(attributeName, out Attribute? attribute))
         {
             return attribute;
@@ -110,7 +126,7 @@ public class Item : IItem
     }
     public Attribute GetOrDefault(string attributeName, object defaultValue)
     {
-        attributeName = Validator.ValidateName(attributeName);
+        attributeName = Attribute.ValidateName(attributeName);
         if (Attributes.TryGetValue(attributeName, out Attribute? attribute))
         {
             return attribute;

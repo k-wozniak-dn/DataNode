@@ -54,6 +54,22 @@ public abstract record DnValue
             throw new InvalidOperationException($"Unsupported value type.");
         }
     }
+    public static string ValidateStringValue(string stringValue)
+    {
+        if (stringValue.Length > System.StringValueLengthLimit)
+        {
+            throw new ArgumentException($"String value length exceeds the limit of {System.StringValueLengthLimit} characters.");
+        }
+        return stringValue;
+    }
+    public static DnValue ValidateValue(DnValue value)
+    {
+        if (value is StringValue stringValue)
+        {
+            ValidateStringValue(stringValue.Value);
+        }
+        return value;
+    }
 }
 
 public record StringValue(string Value) : DnValue;

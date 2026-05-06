@@ -4,9 +4,22 @@ namespace DataNode.Core;
 
 public record Attribute(string Name, DnValue Value, IItem? Parent = null)
 {
+    #region Validate
+    public static string ValidateName(string name)
+    {
+        name = name.Trim().ToUpper();
+        if (name.Length > System.AttributeNameLengthLimit)
+        {
+            throw new ArgumentException($"Attribute name length exceeds the limit of {System.AttributeNameLengthLimit} characters.");
+        }
+        return name;
+    }
+
+    #endregion
+
     #region Properties
-    public string Name { get; } = Validator.ValidateName(Name);
-    public DnValue Value { get; } = Validator.ValidateValue(Value);
+    public string Name { get; } = ValidateName(Name);
+    public DnValue Value { get; } = DnValue.ValidateValue(Value);
     public IItem? Parent { get; } = Parent;
     public bool IsSystemAttribute
     {

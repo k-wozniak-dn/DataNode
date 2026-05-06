@@ -27,7 +27,7 @@ public class DataNode : IParentDataNode
     #region Validate
     public bool ContainsKey(string key)
     {
-        return Items.ContainsKey(Validator.ValidateKey(key));
+        return Items.ContainsKey(Item.ValidateKey(key));
     }
     private string ValidateKeyCount(string key)
     {
@@ -100,10 +100,9 @@ public class DataNode : IParentDataNode
         var result = unindexed.Concat(indexed).ToArray();
         return result;
     }    
-
     public Item? Get(string key)
     {
-        if (Items.TryGetValue(Validator.ValidateKey(key), out Item? item))
+        if (Items.TryGetValue(Item.ValidateKey(key), out Item? item))
         {
             return item;
         }
