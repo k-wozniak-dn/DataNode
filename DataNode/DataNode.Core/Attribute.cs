@@ -4,6 +4,25 @@ namespace DataNode.Core;
 
 public record Attribute(string Name, DnValue Value, IItem? Parent = null)
 {
+
+    #region Properties
+    public string Name { get; } = ValidateName(Name);
+    public DnValue Value { get; } = DnValue.ValidateValue(Value);
+    public IItem? Parent { get; } = Parent;
+
+    #endregion
+
+    #region Query Properties
+    public bool IsSystemAttribute
+    {
+        get
+        {
+            return Name.StartsWith(System.SysAttributeNamePrefix);
+        }
+    }
+    
+    #endregion
+
     #region Validate
     public static string ValidateName(string name)
     {
@@ -15,22 +34,20 @@ public record Attribute(string Name, DnValue Value, IItem? Parent = null)
         return name;
     }
 
-    #endregion
+    #endregion    
 
-    #region Properties
-    public string Name { get; } = ValidateName(Name);
-    public DnValue Value { get; } = DnValue.ValidateValue(Value);
-    public IItem? Parent { get; } = Parent;
-    public bool IsSystemAttribute
+    #region Copy
+    public static Attribute Copy(Attribute attribute, string? name = null, DnValue? value = null, IItem? parent = null)
     {
-        get
-        {
-            return Name.StartsWith(System.SysAttributeNamePrefix);
-        }
+        return new Attribute(name ?? attribute.Name, value ?? attribute.Value, parent ?? attribute.Parent);
     }
-
+    public Attribute Copy(string? name = null, DnValue? value = null, IItem? parent = null)
+    {
+        return Copy(this, name, value, parent);
+    }
+    
     #endregion
-
+    
     #region Convertion
     public string GetString()
     {
@@ -46,18 +63,6 @@ public record Attribute(string Name, DnValue Value, IItem? Parent = null)
     {
         return Value is DecimalValue decimalValue ? decimalValue.Value : 
             throw new InvalidOperationException($"Attribute '{Name}' does not contain a decimal value.");
-    }
-    
-    #endregion
-
-    #region Copy
-    public static Attribute Copy(Attribute attribute, string? name = null, DnValue? value = null, IItem? parent = null)
-    {
-        return new Attribute(name ?? attribute.Name, value ?? attribute.Value, parent ?? attribute.Parent);
-    }
-    public Attribute Copy(string? name = null, DnValue? value = null, IItem? parent = null)
-    {
-        return Copy(this, name, value, parent);
     }
     
     #endregion

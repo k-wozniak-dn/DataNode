@@ -2,6 +2,8 @@ namespace DataNode.Core;
 
 public abstract record DnValue
 {
+    #region Operators
+
     public static implicit operator DnValue(string v)
     {
         return new StringValue(v);
@@ -16,6 +18,31 @@ public abstract record DnValue
     {
         return new DecimalValue(v);
     }
+    
+    #endregion
+
+    #region Validate
+
+    public static string ValidateStringValue(string stringValue)
+    {
+        if (stringValue.Length > System.StringValueLengthLimit)
+        {
+            throw new ArgumentException($"String value length exceeds the limit of {System.StringValueLengthLimit} characters.");
+        }
+        return stringValue;
+    }
+    public static DnValue ValidateValue(DnValue value)
+    {
+        if (value is StringValue stringValue)
+        {
+            ValidateStringValue(stringValue.Value);
+        }
+        return value;
+    }
+
+    #endregion
+    
+    #region Conversion
     public static object ToObjectValue(DnValue value)
     {
         if (value is StringValue stringValue)
@@ -54,22 +81,8 @@ public abstract record DnValue
             throw new InvalidOperationException($"Unsupported value type.");
         }
     }
-    public static string ValidateStringValue(string stringValue)
-    {
-        if (stringValue.Length > System.StringValueLengthLimit)
-        {
-            throw new ArgumentException($"String value length exceeds the limit of {System.StringValueLengthLimit} characters.");
-        }
-        return stringValue;
-    }
-    public static DnValue ValidateValue(DnValue value)
-    {
-        if (value is StringValue stringValue)
-        {
-            ValidateStringValue(stringValue.Value);
-        }
-        return value;
-    }
+
+    #endregion
 }
 
 public record StringValue(string Value) : DnValue;

@@ -17,6 +17,64 @@ public class Item : IItem
         } 
     }
     public IParentDataNode? Parent { get; }
+
+    #endregion
+
+    #region Constructors
+    public Item(IEnumerable<Attribute> attributes, string? key = null, IParentDataNode? parent = null)
+    {
+        if (key != null) key = ValidateKey(key);
+
+        foreach (var attr in attributes) { AddCore(attr, true); }
+        if (key != null) { SetCore(new Attribute(SystemAttributes.Key, key), false, true); }
+        Parent = parent;
+    }
+
+    #endregion   
+
+    #region Validate
+    public static string ValidateKey(string key)
+    {
+        key = key.Trim().ToUpper();
+        if (key.Length > System.KeyLengthLimit)
+        {
+            throw new ArgumentException($"Key length exceeds the limit of {System.KeyLengthLimit} characters.");
+        }
+        return key;
+    }
+    private Attribute ValidateAttributeCount(Attribute attribute)
+    {
+        if (CountNonSys >= System.AttributesCountLimit && !Contains(attribute.Name))
+        {
+            throw new InvalidOperationException($"Attributes count exceeds the limit of {System.AttributesCountLimit}.");
+        }
+        return attribute;
+    }
+    private Attribute ValidateSetExisting(Attribute attribute, bool existingOnly)
+    {
+        if (existingOnly && !Contains(attribute.Name))
+        {
+            throw new InvalidOperationException($"Attribute '{attribute.Name}' does not exist. Use Add to add.");
+        }
+        return attribute;
+    }
+    public static Attribute ValidateNonSys(Attribute attribute)
+    {
+        if (SystemAttributes.All.Contains(attribute.Name))
+        {
+            throw new ArgumentException($"System attribute {attribute.Name} not allowed for this method.");
+        }
+        return attribute;
+    }
+
+    #endregion
+
+    #region QueryProperties
+    public bool Contains(string attributeName)
+    {
+        attributeName = Attribute.ValidateName(attributeName);
+        return Attributes.ContainsKey(attributeName);
+    }
     public int? IndexPosition
     {
         get
@@ -30,79 +88,38 @@ public class Item : IItem
             return Key.StartsWith(System.SysKeyPrefix);
         }
     }
-    public int Count(bool includeSystemAttributes = false) { 
-        return includeSystemAttributes ? Attributes.Count : Attributes.Count(kvp => !kvp.Value.IsSystemAttribute);
-        }
-
-    #endregion
-
-    #region Validate
-    public static string ValidateKey(string key)
+    public int CountSys
     {
-        if (key.Length > System.KeyLengthLimit)
+        get
         {
-            throw new ArgumentException($"Key length exceeds the limit of {System.KeyLengthLimit} characters.");
+            return Attributes.Count(kvp => kvp.Value.IsSystemAttribute);
         }
-        return key.ToUpper();
     }
-    public bool Contains(string attributeName)
+    public int CountNonSys
     {
-        attributeName = Attribute.ValidateName(attributeName);
-        return Attributes.ContainsKey(attributeName);
-    }
-    private string ValidateAttributeCount(string attributeName)
-    {
-        if (Count() >= System.AttributesCountLimit && !Attributes.ContainsKey(attributeName))
+        get
         {
-            throw new InvalidOperationException($"Attributes count exceeds the limit of {System.AttributesCountLimit}.");
+            return Attributes.Count(kvp => !kvp.Value.IsSystemAttribute);
         }
-        return attributeName;
     }
-    private string ValidateSetExisting(string attributeName, bool existingOnly)
+    public int CountAll
     {
-        if (existingOnly && !Contains(attributeName))
+        get
         {
-            throw new InvalidOperationException($"Attribute '{attributeName}' does not exist. Use Add to add.");
+            return Attributes.Count;
         }
-        return attributeName;
-    }
-
-    #endregion
-
-    #region Constructors
-    public Item(IEnumerable<Attribute> attributes, string? key, IParentDataNode? parent = null)
-    {
-        AddAll(attributes, true);
-        if (key != null)
-        {
-            Set(SystemAttributes.Key, ValidateKey(key), false, true); 
-        }
-        Parent = parent;
-    }
-
-    #endregion
-
-    #region Convertion
-    public Dictionary<string, object> ToDictionary()
-    {
-        return GetAll().ToDictionary(attr => attr.Name, attr => DnValue.ToObjectValue(attr.Value));
-    }
-    public static Item FromDictionary(string key, Dictionary<string, object> dict)
-    {
-        var attributes = dict.Select(kvp => new Attribute(kvp.Key, DnValue.FromObjectValue(kvp.Value)));
-        return new Item(attributes, key);
     }
 
     #endregion
 
     #region Copy
-    public static Item Copy(Item from, string key, IParentDataNode? parent)
+    public static Item Copy(Item from, string? key = null, IParentDataNode? parent = null)
     {
         return new Item(from.GetAll(), key, parent);
     }
     public Item Copy(string? key = null, IParentDataNode? parent = null)
     {
-        return Copy(this, key ?? Key, parent);
+        return Copy(this, key, parent);
     }
 
     #endregion
@@ -140,56 +157,77 @@ public class Item : IItem
     #endregion
 
     #region Set
-
     public Attribute TakeOwnership(Attribute attribute)
     {
         return (attribute.Parent != this) ? attribute.Copy(parent: this) : attribute;
     }
-    public Attribute Set(Attribute attribute, bool existingOnly = false, bool skipHandlers = false)
+    private Attribute SetCore(Attribute attribute, bool existingOnly = false, bool skipHandlers = false)
     {
-        ValidateSetExisting(ValidateAttributeCount(attribute.Name), existingOnly);
+        attribute = ValidateSetExisting(ValidateAttributeCount(attribute), existingOnly);
         attribute = TakeOwnership(attribute);
-        if (!skipHandlers) { OnBeforeAttributeSet(attribute); }
+        if (!skipHandlers && !attribute.IsSystemAttribute) { OnBeforeAttributeSet(attribute); }
+        if (!skipHandlers && attribute.IsSystemAttribute) { OnBeforeSysAttributeSet(attribute); }
         Attributes[attribute.Name] = attribute;
-        if (!skipHandlers) { OnAfterAttributeSet(attribute); }
+        if (!skipHandlers && attribute.IsSystemAttribute) { OnAfterSysAttributeSet(attribute); }
+        if (!skipHandlers && !attribute.IsSystemAttribute) { OnAfterAttributeSet(attribute); }
         return attribute;
     }
-    public Attribute Set(string attributeName, object value, bool existingOnly = false, bool skipHandlers = false)
+    public Attribute Set(Attribute attribute, bool existingOnly = false)
+    {
+        attribute = ValidateNonSys(attribute);
+        return SetCore(attribute, existingOnly);
+    }
+    public Attribute Set(string attributeName, object value, bool existingOnly = false)
     {
         var attribute = new Attribute(attributeName, DnValue.FromObjectValue(value));
-        return Set(attribute, existingOnly, skipHandlers);
+        return Set(attribute, existingOnly);
     }
-    public IEnumerable<Attribute> SetAll(IEnumerable<Attribute> attributes, bool existingOnly = false, bool skipHandlers = false )
+    public IEnumerable<Attribute> SetAll(IEnumerable<Attribute> attributes, bool existingOnly = false )
     {
         foreach (var attribute in attributes)
         {
-            Set(attribute, existingOnly, skipHandlers);
+            Set(attribute, existingOnly);
         }
         return attributes;
     }
-
+    public Attribute? RefreshIndexAttribute()
+    {
+        var idxAttribute = Get(SystemAttributes.Indexed);
+        if (idxAttribute != null && idxAttribute.GetInteger() != IndexPosition)
+        {
+            SetCore(new Attribute(SystemAttributes.Indexed, IndexPosition ?? -1), true, true);
+        }
+        return idxAttribute;
+    }
     #endregion
 
     #region Add
-    public Attribute Add(Attribute attribute, bool skipHandlers = false)
+    private Attribute AddCore(Attribute attribute, bool skipHandlers = false)
     {
-        ValidateAttributeCount(attribute.Name);
-        attribute = TakeOwnership(attribute);        
-        if (!skipHandlers) { OnBeforeAttributeSet(attribute); }
-        Attributes.Add(attribute.Name, attribute);
-        if (!skipHandlers) { OnAfterAttributeSet(attribute); }
+        attribute = ValidateAttributeCount(attribute);
+        attribute = TakeOwnership(attribute);
+        if (!skipHandlers && !attribute.IsSystemAttribute) { OnBeforeAttributeSet(attribute); }
+        if (!skipHandlers && attribute.IsSystemAttribute) { OnBeforeSysAttributeSet(attribute); }
+        Attributes[attribute.Name] = attribute;
+        if (!skipHandlers && attribute.IsSystemAttribute) { OnAfterSysAttributeSet(attribute); }
+        if (!skipHandlers && !attribute.IsSystemAttribute) { OnAfterAttributeSet(attribute); }
         return attribute;
     }
-    public Attribute Add(string attributeName, object value, bool skipHandlers = false)
+    public Attribute Add(Attribute attribute)
+    {
+        attribute = ValidateNonSys(attribute);
+        return AddCore(attribute);
+    }
+    public Attribute Add(string attributeName, object value)
     {
         var attribute = new Attribute(attributeName, DnValue.FromObjectValue(value));
-        return Add(attribute, skipHandlers);
+        return Add(attribute);
     }
-    public IEnumerable<Attribute> AddAll(IEnumerable<Attribute> attributes, bool skipHandlers = false )
+    public IEnumerable<Attribute> AddAll(IEnumerable<Attribute> attributes )
     {
         foreach (var attribute in attributes)
         {
-            Add(attribute, skipHandlers);
+            Add(attribute);
         }
         return attributes;
     }
@@ -197,30 +235,79 @@ public class Item : IItem
     #endregion
 
     #region Remove
-    public Attribute Remove(string attributeName, bool skipHandlers = false)
+    private Attribute RemoveCore(string attributeName, bool skipHandlers = false)
     {
         var attribute = Get(attributeName) ?? throw new InvalidOperationException($"Attribute '{attributeName}' does not exist.");
-        if (!skipHandlers) { OnBeforeAttributeRemove(attribute); }
+        if (!skipHandlers && !attribute.IsSystemAttribute) { OnBeforeAttributeRemove(attribute); }
+        if (!skipHandlers && attribute.IsSystemAttribute) { OnBeforeSysAttributeRemove(attribute); }
         Attributes.Remove(attribute.Name);
-        if (!skipHandlers) { OnAfterAttributeRemove(attribute); }
+        if (!skipHandlers && attribute.IsSystemAttribute) { OnAfterSysAttributeRemove(attribute); }
+        if (!skipHandlers && !attribute.IsSystemAttribute) { OnAfterAttributeRemove(attribute); }
         return attribute;
     }
-    public Attribute Remove(Attribute attribute, bool skipHandlers = false)
+    public Attribute Remove(string attributeName)
     {
-        return Remove(attribute.Name, skipHandlers);
+        var attribute = Get(attributeName) ?? throw new InvalidOperationException($"Attribute '{attributeName}' does not exist.");
+        attribute = ValidateNonSys(attribute);
+        return RemoveCore(attribute.Name);
     }
-    public IEnumerable<Attribute> RemoveAll(IEnumerable<string> attributeNames, bool skipHandlers = false)
+    public Attribute Remove(Attribute attribute)
+    {
+        return Remove(attribute.Name);
+    }
+    public IEnumerable<Attribute> RemoveAll(IEnumerable<string> attributeNames)
     {
         var removedAttributes = new List<Attribute>();
         foreach (var attributeName in attributeNames)
         {
-            removedAttributes.Add(Remove(attributeName, skipHandlers));
+            removedAttributes.Add(Remove(attributeName));
         }
         return removedAttributes;
     }
-    public IEnumerable<Attribute> RemoveAll(IEnumerable<Attribute> attributes, bool skipHandlers = false)
+    public IEnumerable<Attribute> RemoveAll(IEnumerable<Attribute> attributes)
     {
-        return RemoveAll(attributes.Select(attr => attr.Name), skipHandlers);
+        return RemoveAll(attributes.Select(attr => attr.Name));
+    }
+
+    #endregion
+
+    #region Sys Handlers
+
+    private void OnBeforeSysAttributeSet(Attribute attribute)
+    {
+        switch (attribute.Name)
+        {
+            case SystemAttributes.Indexed:
+                if (IsSystemItem)
+                {
+                    throw new InvalidOperationException($"Attribute '{attribute.Name}' cannot be set in system item.");
+                }
+                break;
+        }
+    }
+
+    private void OnAfterSysAttributeSet(Attribute attribute)
+    {
+        switch (attribute.Name)
+        {
+            case SystemAttributes.Indexed:
+                Parent?.SetIndex(this);
+                break;
+        }
+    }
+
+    private void OnBeforeSysAttributeRemove(Attribute attribute)
+    {
+    }
+
+    private void OnAfterSysAttributeRemove(Attribute attribute)
+    {
+        switch (attribute.Name)
+        {
+            case SystemAttributes.Indexed:
+                Parent?.RemoveIndex(this);
+                break;
+        }
     }
 
     #endregion
@@ -229,80 +316,32 @@ public class Item : IItem
 
     protected virtual void OnBeforeAttributeSet(Attribute attribute)
     {
-        if (attribute.IsSystemAttribute)
-        {
-            switch (attribute.Name)
-            {
-                case SystemAttributes.Indexed:
-                    if (IsSystemItem)
-                    {
-                        throw new InvalidOperationException($"Attribute '{attribute.Name}' cannot be set in system item.");
-                    }
-                break;
-            }
-        }
-        else
-        {
-            // switch (attribute.Name)
-            // {
-            // }
-        }
     }
 
     protected virtual void OnAfterAttributeSet(Attribute attribute)
     {
-        if (attribute.IsSystemAttribute)
-        {
-            switch (attribute.Name)
-            {
-                case SystemAttributes.Indexed:
-                    Parent?.SetIndex(this);
-                    break;
-            }
-        }
-        else
-        {
-            // switch (attribute.Name)
-            // {
-            // }
-        }
     }
 
     protected virtual void OnBeforeAttributeRemove(Attribute attribute)
     {
-        if (attribute.IsSystemAttribute)
-        {
-            // switch (attribute.Name)
-            // {
-            // }
-        }
-        else
-        {
-            // switch (attribute.Name)
-            // {
-            // }
-        }
     }
 
     protected virtual void OnAfterAttributeRemove(Attribute attribute)
     {
-        if (attribute.IsSystemAttribute)
-        {
-            switch (attribute.Name)
-            {
-                case SystemAttributes.Indexed:
-                Parent?.RemoveIndex(this);
-                break;
-            }
-        }
-        else
-        {
-            // switch (attribute.Name)
-            // {
-            // }
-        }
     }
 
     #endregion
 
+    #region Convertion
+    public Dictionary<string, object> ToDictionary()
+    {
+        return GetAll().ToDictionary(attr => attr.Name, attr => DnValue.ToObjectValue(attr.Value));
+    }
+    public static Item FromDictionary(Dictionary<string, object> dict)
+    {
+        var attributes = dict.Select(kvp => new Attribute(kvp.Key, DnValue.FromObjectValue(kvp.Value)));
+        return new Item(attributes);
+    }
+
+    #endregion
 }

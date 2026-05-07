@@ -15,7 +15,7 @@ public static class SystemAttributes
 {
     public const string Key = $"{System.SysAttributeNamePrefix}KEY";
     public const string Indexed = $"{System.SysAttributeNamePrefix}IDX";
-    public static readonly HashSet<string> All = [Indexed];
+    public static readonly HashSet<string> All = [Key, Indexed];
 }
 
 public static class SystemKeys

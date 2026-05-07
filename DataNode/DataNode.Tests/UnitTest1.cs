@@ -24,7 +24,7 @@ public class UnitTest1
         dataNode.Set(item2);
 
         // Assert
-        var count = dataNode.GetAll().Sum(item => item.Count());
+        var count = dataNode.GetAll().Sum(item => item.CountNonSys);
         var total = dataNode.GetAll().Sum(item => item.Get("Price")?.GetDecimal() * item.Get("Quantity")?.GetInteger());
         Assert.Equal(7, count); 
         Assert.Equal(45m, total); 
@@ -49,7 +49,7 @@ public class UnitTest1
         item2.Set("Quantity", 20);
 
         // Assert
-        var count = dataNode.GetAll().Sum(item => item.Count());
+        var count = dataNode.GetAll().Sum(item => item.CountNonSys);
         var total = dataNode.GetAll().Sum(item => item.Get("Price")?.GetDecimal() * item.Get("Quantity")?.GetInteger());
         Assert.Equal(7, count); 
         Assert.Equal(45m, total); 
@@ -65,7 +65,6 @@ public class UnitTest1
         item1.Add("Name", "Apples");
         item1.Add("Price", 1.5m);
         item1.Add("Quantity", 10);
-        item1.Add("*idx", -1);
 
         var item2 = item1.Copy("item2");
         item2.Add("Brand", "Sunny");
@@ -75,7 +74,7 @@ public class UnitTest1
         var dn = new Core.DataNode(items);
 
         // Assert
-        var count = dn.GetAll().Sum(item => item.Count());
+        var count = dn.GetAll().Sum(item => item.CountNonSys);
         var total = dn.GetAll().Sum(item => item.Get("Price")?.GetDecimal() * item.Get("Quantity")?.GetInteger());
         Assert.Equal(7, count); 
         Assert.Equal(45m, total); 
