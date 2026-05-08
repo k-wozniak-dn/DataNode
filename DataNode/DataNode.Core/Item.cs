@@ -161,7 +161,7 @@ public class Item : IItem
     {
         return (attribute.Parent != this) ? attribute.Copy(parent: this) : attribute;
     }
-    private Attribute SetCore(Attribute attribute, bool existingOnly = false, bool skipHandlers = false)
+    private Attribute? SetCore(Attribute attribute, bool existingOnly = false, bool skipHandlers = false)
     {
         attribute = ValidateSetExisting(ValidateAttributeCount(attribute), existingOnly);
         attribute = TakeOwnership(attribute);
@@ -170,14 +170,14 @@ public class Item : IItem
         Attributes[attribute.Name] = attribute;
         if (!skipHandlers && attribute.IsSystemAttribute) { OnAfterSysAttributeSet(attribute); }
         if (!skipHandlers && !attribute.IsSystemAttribute) { OnAfterAttributeSet(attribute); }
-        return attribute;
+        return Get(attribute.Name);
     }
-    public Attribute Set(Attribute attribute, bool existingOnly = false)
+    public Attribute? Set(Attribute attribute, bool existingOnly = false)
     {
         attribute = ValidateNonSys(attribute);
         return SetCore(attribute, existingOnly);
     }
-    public Attribute Set(string attributeName, object value, bool existingOnly = false)
+    public Attribute? Set(string attributeName, object value, bool existingOnly = false)
     {
         var attribute = new Attribute(attributeName, DnValue.FromObjectValue(value));
         return Set(attribute, existingOnly);
@@ -199,10 +199,11 @@ public class Item : IItem
         }
         return idxAttribute;
     }
+
     #endregion
 
     #region Add
-    private Attribute AddCore(Attribute attribute, bool skipHandlers = false)
+    private Attribute? AddCore(Attribute attribute, bool skipHandlers = false)
     {
         attribute = ValidateAttributeCount(attribute);
         attribute = TakeOwnership(attribute);
@@ -211,14 +212,14 @@ public class Item : IItem
         Attributes[attribute.Name] = attribute;
         if (!skipHandlers && attribute.IsSystemAttribute) { OnAfterSysAttributeSet(attribute); }
         if (!skipHandlers && !attribute.IsSystemAttribute) { OnAfterAttributeSet(attribute); }
-        return attribute;
+        return Get(attribute.Name);
     }
-    public Attribute Add(Attribute attribute)
+    public Attribute? Add(Attribute attribute)
     {
         attribute = ValidateNonSys(attribute);
         return AddCore(attribute);
     }
-    public Attribute Add(string attributeName, object value)
+    public Attribute? Add(string attributeName, object value)
     {
         var attribute = new Attribute(attributeName, DnValue.FromObjectValue(value));
         return Add(attribute);
@@ -344,4 +345,29 @@ public class Item : IItem
     }
 
     #endregion
+
+    #region Index
+    public Attribute? SetIndex()
+    {
+        return SetCore(new Attribute(SystemAttributes.Indexed, -1));
+    }
+    public Attribute RemoveIndex()
+    {
+        return RemoveCore(SystemAttributes.Indexed);
+    }
+    public Item MoveToEnd()
+    {
+        return Parent?.MoveToEnd(this) ?? throw new InvalidOperationException("This item can't indexed.");
+    }
+    public Item MoveToStart()
+    {
+        return Parent?.MoveToStart(this) ?? throw new InvalidOperationException("This item can't indexed.");
+    }
+    public Item Move(int offset)
+    {
+        return Parent?.Move(this, offset) ?? throw new InvalidOperationException("This item can't indexed.");
+    }
+    
+    #endregion
+
 }

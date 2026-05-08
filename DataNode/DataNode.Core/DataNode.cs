@@ -9,6 +9,9 @@ public interface IParentDataNode
     int GetIndex(string key);
     Item SetIndex(Item item);
     Item RemoveIndex(Item item);
+    Item MoveToEnd(Item item);
+    Item MoveToStart(Item item);
+    Item Move(Item item, int offset);
 }
 
 public class DataNode : IParentDataNode
